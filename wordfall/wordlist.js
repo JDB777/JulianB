@@ -1,4 +1,4 @@
-// wordlist.js — loads common English words, exposes isValidWord()
+// wordlist.js — loads Scrabble-valid English words, exposes isValidWord()
 
 let WORD_SET = new Set()
 
@@ -6,7 +6,7 @@ export async function loadWords(onProgress = () => {}) {
   try {
     onProgress(5)
     const res = await fetch(
-      'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt'
+      'https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt'
     )
     if (!res.ok) throw new Error('fetch failed')
 

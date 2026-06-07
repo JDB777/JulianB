@@ -58,8 +58,16 @@ const nameInput   = $('player-name')
 const lbList      = $('scores-list')
 
 // ── Deck ──────────────────────────────────────────────────────────────────────
+// Consonant-only deck (Y treated as vowel, excluded). Every 4th draw is a
+// random vowel so the player always has vowels to work with, but consonants
+// never repeat within a cycle.
+const VOWELS     = ['A','E','I','O','U']
+const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXZ'.split('')  // 20 letters
+
+let drawCount = 0   // resets each game; drives the every-4th vowel rule
+
 function freshDeck() {
-  const a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+  const a = [...CONSONANTS]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]]
@@ -68,6 +76,10 @@ function freshDeck() {
 }
 
 function draw() {
+  drawCount++
+  if (drawCount % 4 === 0) {
+    return VOWELS[Math.floor(Math.random() * VOWELS.length)]
+  }
   if (deckIdx >= deck.length) { deck = freshDeck(); deckIdx = 0 }
   return deck[deckIdx++]
 }
@@ -369,6 +381,7 @@ function startGame() {
   active       = null
   deck         = freshDeck()
   deckIdx      = 0
+  drawCount    = 0
   score        = 0
   wordsCleared = 0
   longestWord  = ''
