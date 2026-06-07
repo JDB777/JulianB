@@ -166,6 +166,7 @@ html, body {
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   touch-action: manipulation;
 }
 .ctrl-btn:active, .ctrl-btn.pressed {

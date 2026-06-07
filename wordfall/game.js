@@ -374,6 +374,9 @@ bindBtn('btn-down',  moveDown)
 // Pause is a simple tap — no hold-repeat
 $('btn-pause').addEventListener('pointerdown', e => { e.preventDefault(); togglePause() })
 
+// Suppress Chrome Android's long-press context menu on the whole page
+document.addEventListener('contextmenu', e => e.preventDefault())
+
 // Keyboard fallback (desktop / keyboard-connected tablet)
 document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft')  { e.preventDefault(); moveLeft()    }
