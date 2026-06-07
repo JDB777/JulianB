@@ -36,6 +36,7 @@ let deckIdx      = 0
 let score        = 0
 let wordsCleared = 0
 let longestWord  = ''
+let spelledWords = []
 let running      = false
 let animating    = false
 let paused       = false
@@ -244,11 +245,13 @@ async function flashClear(words) {
     score += pts
     wordsCleared++
     if (word.length > longestWord.length) longestWord = word
+    spelledWords.push(word)
     cells.forEach(({ r, c }) => hit.add(`${r},${c}`))
   }
 
   scoreEl.textContent = score
   $('words-counter').textContent = `${Math.min(wordsCleared, GOAL_WORDS)}/3`
+  renderWordList()
 
   flashBanner(words.map(w => w.word).join('  +  '))
 
@@ -283,6 +286,13 @@ function gravity() {
       board[r][c] = idx >= 0 ? letters[idx] : null
     }
   }
+}
+
+// ── Word list column ──────────────────────────────────────────────────────────
+function renderWordList() {
+  const el = $('word-list')
+  el.innerHTML = spelledWords.slice().reverse()
+    .map(w => `<div class="wl-entry">${w}</div>`).join('')
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -340,6 +350,7 @@ async function endGame(reason) {
   $('final-time').textContent  = `${timeUsed}s`
   $('final-count').textContent = `${wc} / 3`
   $('final-word').textContent  = longestWord || '—'
+  $('modal-words').innerHTML   = spelledWords.map(w => `<span class="mw-badge">${w}</span>`).join('')
 
   await loadLB()
   overlay.classList.remove('hidden')
@@ -385,6 +396,7 @@ function startGame() {
   score        = 0
   wordsCleared = 0
   longestWord  = ''
+  spelledWords = []
   dropMs       = BASE_INTERVAL
   animating    = false
   paused       = false
@@ -393,6 +405,7 @@ function startGame() {
 
   scoreEl.textContent = 0
   $('words-counter').textContent = '0/3'
+  $('word-list').innerHTML = ''
   updateTimerDisplay()
   lastWordEl.classList.remove('visible')
   overlay.classList.add('hidden')

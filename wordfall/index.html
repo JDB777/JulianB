@@ -48,9 +48,22 @@
     </div>
 
     <div id="board-wrap">
-      <div id="board"></div>
-      <div id="pause-overlay" class="hidden">
-        <div id="pause-text">PAUSED</div>
+      <div id="word-list"></div>
+      <div id="board-area">
+        <div id="board"></div>
+        <div id="pause-overlay" class="hidden">
+          <div id="pause-text">
+            <div class="pause-title">PAUSED</div>
+            <div id="letter-grid">
+              <span>A<small>1</small></span><span>B<small>3</small></span><span>C<small>3</small></span><span>D<small>2</small></span><span>E<small>1</small></span>
+              <span>F<small>4</small></span><span>G<small>2</small></span><span>H<small>4</small></span><span>I<small>1</small></span><span>J<small>8</small></span>
+              <span>K<small>5</small></span><span>L<small>1</small></span><span>M<small>3</small></span><span>N<small>1</small></span><span>O<small>1</small></span>
+              <span>P<small>3</small></span><span>Q<small>10</small></span><span>R<small>1</small></span><span>S<small>1</small></span><span>T<small>1</small></span>
+              <span>U<small>1</small></span><span>V<small>4</small></span><span>W<small>4</small></span><span>X<small>8</small></span><span>Y<small>4</small></span>
+              <span>Z<small>10</small></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -78,6 +91,10 @@
         <div class="stat-row"><span>TIME USED</span>     <strong id="final-time">—</strong></div>
         <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/3</strong></div>
         <div class="stat-row"><span>LONGEST WORD</span>  <strong id="final-word">—</strong></div>
+      </div>
+      <div id="modal-words-section">
+        <div class="stat-label" style="letter-spacing:2px;">WORDS SPELLED</div>
+        <div id="modal-words"></div>
       </div>
       <div id="name-section">
         <input id="player-name" type="text" maxlength="12" placeholder="YOUR NAME"
