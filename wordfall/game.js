@@ -4,9 +4,9 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { loadWords, isValidWord } from './wordlist.js'
 
 // ── Config ───────────────────────────────────────────────────────────────────
-const COLS          = 10
+const COLS          = 7
 const ROWS          = 10
-const SPAWN_COL     = 4      // 0-indexed center-ish column
+const SPAWN_COL     = 3      // 0-indexed center column of 7
 const BASE_INTERVAL = 1000   // ms per auto-drop at game start
 const MIN_INTERVAL  = 150    // ms per auto-drop at max speed
 const SPEED_EVERY   = 3      // words cleared before each speed tick
@@ -36,6 +36,7 @@ let wordsCleared = 0
 let longestWord  = ''
 let running      = false
 let animating    = false
+let paused       = false
 let dropMs       = BASE_INTERVAL
 let lastDrop     = 0
 
@@ -114,21 +115,21 @@ function canDown() {
 }
 
 function moveLeft() {
-  if (!active || animating) return
+  if (!active || animating || paused) return
   if (active.col > 0 && board[active.row][active.col - 1] === null) {
     active.col--; render()
   }
 }
 
 function moveRight() {
-  if (!active || animating) return
+  if (!active || animating || paused) return
   if (active.col < COLS - 1 && board[active.row][active.col + 1] === null) {
     active.col++; render()
   }
 }
 
 function moveDown() {
-  if (!active || animating) return
+  if (!active || animating || paused) return
   if (canDown()) { active.row++; lastDrop = performance.now(); render() }
   else lock()
 }
@@ -262,10 +263,19 @@ function flashBanner(text) {
   setTimeout(() => lastWordEl.classList.remove('visible'), 2200)
 }
 
+// ── Pause ─────────────────────────────────────────────────────────────────────
+function togglePause() {
+  if (!running) return
+  paused = !paused
+  $('pause-overlay').classList.toggle('hidden', !paused)
+  $('btn-pause').textContent = paused ? '▶' : '❚❚'
+  if (!paused) lastDrop = performance.now() // don't penalise unpause with instant drop
+}
+
 // ── Game loop ─────────────────────────────────────────────────────────────────
 function loop(ts) {
   if (!running) return
-  if (!animating && active && ts - lastDrop >= dropMs) {
+  if (!paused && !animating && active && ts - lastDrop >= dropMs) {
     lastDrop = ts
     if (canDown()) { active.row++; render() } else lock()
   }
@@ -323,11 +333,14 @@ function startGame() {
   longestWord  = ''
   dropMs       = BASE_INTERVAL
   animating    = false
+  paused       = false
   running      = true
 
   scoreEl.textContent = 0
   lastWordEl.classList.remove('visible')
   overlay.classList.add('hidden')
+  $('pause-overlay').classList.add('hidden')
+  $('btn-pause').textContent = '❚❚'
 
   buildGrid()
   nextLetter = draw()
@@ -358,12 +371,16 @@ bindBtn('btn-left',  moveLeft)
 bindBtn('btn-right', moveRight)
 bindBtn('btn-down',  moveDown)
 
+// Pause is a simple tap — no hold-repeat
+$('btn-pause').addEventListener('pointerdown', e => { e.preventDefault(); togglePause() })
+
 // Keyboard fallback (desktop / keyboard-connected tablet)
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft')  { e.preventDefault(); moveLeft()  }
-  if (e.key === 'ArrowRight') { e.preventDefault(); moveRight() }
-  if (e.key === 'ArrowDown')  { e.preventDefault(); moveDown()  }
-  if (e.key === ' ')          { e.preventDefault(); moveDown()  }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); moveLeft()    }
+  if (e.key === 'ArrowRight') { e.preventDefault(); moveRight()   }
+  if (e.key === 'ArrowDown')  { e.preventDefault(); moveDown()    }
+  if (e.key === ' ')          { e.preventDefault(); moveDown()    }
+  if (e.key === 'p' || e.key === 'Escape') { e.preventDefault(); togglePause() }
 })
 
 // Modal actions

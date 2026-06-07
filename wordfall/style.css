@@ -7,8 +7,8 @@
   --bg:      #fff;
   --border:  #000;
   --dim:     rgba(0,0,0,0.18);
-  /* cell size: fit 10 cols inside viewport width with a little padding */
-  --cell: min(calc((100vw - 24px) / 10), calc((100dvh - 220px) / 10));
+  /* cell size: fit 7 cols across the width, 10 rows in the remaining height */
+  --cell: min(calc((100vw - 24px) / 7), calc((100dvh - 220px) / 10));
   --font: 'Courier New', Courier, monospace;
 }
 
@@ -86,10 +86,28 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
   padding: 6px 0;
+  position: relative;
+}
+
+/* ── Pause overlay ─────────────────────────────────── */
+#pause-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.88);
+  z-index: 10;
+}
+#pause-overlay.hidden { display: none; }
+#pause-text {
+  font-size: 2rem; font-weight: 900;
+  letter-spacing: 8px;
+  border: 4px solid var(--border);
+  padding: 16px 32px;
+  background: var(--bg);
 }
 #board {
   display: grid;
-  grid-template-columns: repeat(10, var(--cell));
+  grid-template-columns: repeat(7, var(--cell));
   grid-template-rows:    repeat(10, var(--cell));
   border: 3px solid var(--border);
 }
@@ -152,6 +170,11 @@ html, body {
 }
 .ctrl-btn:active, .ctrl-btn.pressed {
   background: var(--fg); color: var(--bg);
+}
+#btn-pause {
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  width: 72px;
 }
 
 /* ── Modal ─────────────────────────────────────────── */
