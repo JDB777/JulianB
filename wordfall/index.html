@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <title>WordFall</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="loading-screen">
+    <div id="loading-inner">
+      <div id="loading-title">WORDFALL</div>
+      <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+      <div id="loading-label">LOADING DICTIONARY...</div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <header id="hdr">
+      <div id="score-block">
+        <div class="stat-label">SCORE</div>
+        <div id="score">0</div>
+      </div>
+      <h1 id="title">WORDFALL</h1>
+      <div id="next-block">
+        <div class="stat-label">NEXT</div>
+        <div id="next-letter"></div>
+      </div>
+    </header>
+
+    <div id="board-wrap">
+      <div id="board"></div>
+    </div>
+
+    <div id="last-word-row">
+      <span id="last-word"></span>
+    </div>
+
+    <footer id="ftr">
+      <div id="controls">
+        <button id="btn-left"  class="ctrl-btn" aria-label="Move left">&#9664;</button>
+        <button id="btn-down"  class="ctrl-btn" aria-label="Drop faster">&#9660;</button>
+        <button id="btn-right" class="ctrl-btn" aria-label="Move right">&#9654;</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <h2>GAME OVER</h2>
+      <div id="final-stats">
+        <div class="stat-row"><span>SCORE</span><strong id="final-score">0</strong></div>
+        <div class="stat-row"><span>LONGEST WORD</span><strong id="final-word">—</strong></div>
+        <div class="stat-row"><span>WORDS SPELLED</span><strong id="final-count">0</strong></div>
+      </div>
+      <div id="name-section">
+        <input id="player-name" type="text" maxlength="12" placeholder="YOUR NAME" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button id="btn-submit">SAVE</button>
+      </div>
+      <div id="lb-section">
+        <div id="lb-title">TOP SCORES</div>
+        <ol id="scores-list"></ol>
+      </div>
+      <button id="btn-restart">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
