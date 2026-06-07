@@ -64,6 +64,30 @@
             </div>
           </div>
         </div>
+        <div id="modal-overlay" class="hidden">
+          <h2 id="result-heading">GAME OVER</h2>
+          <p  id="result-sub"></p>
+          <div id="final-stats">
+            <div class="stat-row"><span>SCORE</span>         <strong id="final-score">0</strong></div>
+            <div class="stat-row"><span>TIME USED</span>     <strong id="final-time">—</strong></div>
+            <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/3</strong></div>
+            <div class="stat-row"><span>LONGEST WORD</span>  <strong id="final-word">—</strong></div>
+          </div>
+          <div id="modal-words-section">
+            <div class="stat-label" style="letter-spacing:2px;">WORDS SPELLED</div>
+            <div id="modal-words"></div>
+          </div>
+          <div id="name-section">
+            <input id="player-name" type="text" maxlength="12" placeholder="YOUR NAME"
+                   autocomplete="off" autocorrect="off" spellcheck="false">
+            <button id="btn-submit">SAVE</button>
+          </div>
+          <div id="lb-section">
+            <div id="lb-title">TOP SCORES</div>
+            <ol id="scores-list"></ol>
+          </div>
+          <button id="btn-restart">PLAY AGAIN</button>
+        </div>
       </div>
     </div>
 
@@ -79,34 +103,6 @@
       </div>
     </footer>
 
-  </div>
-
-  <!-- Result Modal (win / time's up / board full) -->
-  <div id="modal-overlay" class="hidden">
-    <div id="modal">
-      <h2 id="result-heading">GAME OVER</h2>
-      <p  id="result-sub"></p>
-      <div id="final-stats">
-        <div class="stat-row"><span>SCORE</span>         <strong id="final-score">0</strong></div>
-        <div class="stat-row"><span>TIME USED</span>     <strong id="final-time">—</strong></div>
-        <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/3</strong></div>
-        <div class="stat-row"><span>LONGEST WORD</span>  <strong id="final-word">—</strong></div>
-      </div>
-      <div id="modal-words-section">
-        <div class="stat-label" style="letter-spacing:2px;">WORDS SPELLED</div>
-        <div id="modal-words"></div>
-      </div>
-      <div id="name-section">
-        <input id="player-name" type="text" maxlength="12" placeholder="YOUR NAME"
-               autocomplete="off" autocorrect="off" spellcheck="false">
-        <button id="btn-submit">SAVE</button>
-      </div>
-      <div id="lb-section">
-        <div id="lb-title">TOP SCORES</div>
-        <ol id="scores-list"></ol>
-      </div>
-      <button id="btn-restart">PLAY AGAIN</button>
-    </div>
   </div>
 
   <script type="module" src="game.js"></script>
