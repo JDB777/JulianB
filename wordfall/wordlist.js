@@ -4,17 +4,36 @@ let WORD_SET = new Set()
 
 export async function loadWords(onProgress = () => {}) {
   try {
-    onProgress(15)
+    onProgress(5)
     const res = await fetch(
-      'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-long.txt'
+      'https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt'
     )
     if (!res.ok) throw new Error('fetch failed')
-    onProgress(55)
-    const text = await res.text()
-    onProgress(80)
-    const words = text.split('\n')
+
+    // Stream with real byte-progress so the loading bar tracks the actual download
+    const total = parseInt(res.headers.get('content-length') || '0', 10)
+    const reader = res.body.getReader()
+    const chunks = []
+    let received = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      received += value.length
+      if (total > 0) onProgress(5 + Math.round((received / total) * 75))
+    }
+
+    onProgress(82)
+    const merged = new Uint8Array(received)
+    let off = 0
+    for (const chunk of chunks) { merged.set(chunk, off); off += chunk.length }
+
+    onProgress(90)
+    const words = new TextDecoder().decode(merged)
+      .split('\n')
       .map(w => w.trim().toUpperCase())
       .filter(w => w.length >= 3 && /^[A-Z]+$/.test(w))
+
     WORD_SET = new Set([...words, ...CORE_WORDS])
     onProgress(100)
   } catch {
