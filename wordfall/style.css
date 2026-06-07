@@ -64,6 +64,7 @@ html, body {
   min-width: 72px; gap: 1px;
 }
 .hdr-right { align-items: flex-end; }
+#hdr-left { display: flex; align-items: center; gap: 6px; }
 .stat-label { font-size: 0.5rem; letter-spacing: 2px; opacity: 0.65; }
 
 /* Timer */
@@ -190,7 +191,9 @@ html, body {
   touch-action: manipulation;
 }
 .ctrl-btn:active { background: var(--fg); color: var(--bg); }
-#btn-pause { font-size: 1rem; letter-spacing: 2px; width: 68px; }
+
+/* Pause button lives in the header — smaller than game controls */
+#btn-pause { width: 44px; height: 44px; font-size: 0.9rem; letter-spacing: 0; flex-shrink: 0; }
 
 /* ── Modal ─────────────────────────────────────────── */
 #modal-overlay {

@@ -11,8 +11,8 @@ const BASE_INTERVAL = 1000   // ms per auto-drop at start
 const MIN_INTERVAL  = 150    // ms per auto-drop at max speed
 const SPEED_EVERY   = 3      // words before each speed tick
 const SPEED_REDUCE  = 40     // ms removed per tick
-const GOAL_WORDS    = 5      // words needed to win
-const GOAL_TIME     = 100    // seconds on the clock
+const GOAL_WORDS    = 3      // words needed to win
+const GOAL_TIME     = 90     // seconds on the clock
 
 // Scrabble-derived letter point values
 const PV = {
@@ -236,7 +236,7 @@ async function flashClear(words) {
   }
 
   scoreEl.textContent = score
-  $('words-counter').textContent = `${Math.min(wordsCleared, GOAL_WORDS)}/5`
+  $('words-counter').textContent = `${Math.min(wordsCleared, GOAL_WORDS)}/3`
 
   flashBanner(words.map(w => w.word).join('  +  '))
 
@@ -315,18 +315,18 @@ async function endGame(reason) {
 
   if (reason === 'win') {
     heading.textContent = 'YOU WIN!'
-    sub.textContent     = `All 5 words spelled in ${timeUsed} second${timeUsed !== 1 ? 's' : ''}!`
+    sub.textContent     = `All 3 words spelled in ${timeUsed} second${timeUsed !== 1 ? 's' : ''}!`
   } else if (reason === 'time') {
     heading.textContent = "TIME'S UP"
-    sub.textContent     = `${wc} of 5 words spelled before time ran out.`
+    sub.textContent     = `${wc} of 3 words spelled before time ran out.`
   } else {
     heading.textContent = 'BOARD FULL'
-    sub.textContent     = `${wc} of 5 words spelled before the board filled.`
+    sub.textContent     = `${wc} of 3 words spelled before the board filled.`
   }
 
   $('final-score').textContent = score
   $('final-time').textContent  = `${timeUsed}s`
-  $('final-count').textContent = `${wc} / 5`
+  $('final-count').textContent = `${wc} / 3`
   $('final-word').textContent  = longestWord || '—'
 
   await loadLB()
@@ -379,7 +379,7 @@ function startGame() {
   running      = true
 
   scoreEl.textContent = 0
-  $('words-counter').textContent = '0/5'
+  $('words-counter').textContent = '0/3'
   updateTimerDisplay()
   lastWordEl.classList.remove('visible')
   overlay.classList.add('hidden')

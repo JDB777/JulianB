@@ -13,21 +13,24 @@
     <div id="loading-inner">
       <div id="loading-title">WORDFALL</div>
       <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-      <div id="loading-label">SPELL 5 WORDS IN 100 SECONDS!</div>
+      <div id="loading-label">SPELL 3 WORDS IN 90 SECONDS!</div>
     </div>
   </div>
 
   <div id="app" class="hidden">
 
-    <!-- Row 1: timer | title | word counter -->
+    <!-- Row 1: [pause | timer] | title | words -->
     <header id="hdr">
-      <div class="hdr-col">
-        <div id="timer">1:40</div>
-        <div class="stat-label">TIME</div>
+      <div id="hdr-left">
+        <button id="btn-pause" class="ctrl-btn" aria-label="Pause">&#9646;&#9646;</button>
+        <div class="hdr-col">
+          <div id="timer">1:30</div>
+          <div class="stat-label">TIME</div>
+        </div>
       </div>
       <h1 id="title">WORDFALL</h1>
       <div class="hdr-col hdr-right">
-        <div id="words-counter">0/5</div>
+        <div id="words-counter">0/3</div>
         <div class="stat-label">WORDS</div>
       </div>
     </header>
@@ -60,7 +63,6 @@
         <button id="btn-left"  class="ctrl-btn" aria-label="Move left">&#9664;</button>
         <button id="btn-down"  class="ctrl-btn" aria-label="Drop faster">&#9660;</button>
         <button id="btn-right" class="ctrl-btn" aria-label="Move right">&#9654;</button>
-        <button id="btn-pause" class="ctrl-btn" aria-label="Pause">&#9646;&#9646;</button>
       </div>
     </footer>
 
@@ -74,7 +76,7 @@
       <div id="final-stats">
         <div class="stat-row"><span>SCORE</span>         <strong id="final-score">0</strong></div>
         <div class="stat-row"><span>TIME USED</span>     <strong id="final-time">—</strong></div>
-        <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/5</strong></div>
+        <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/3</strong></div>
         <div class="stat-row"><span>LONGEST WORD</span>  <strong id="final-word">—</strong></div>
       </div>
       <div id="name-section">
