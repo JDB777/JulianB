@@ -6,11 +6,13 @@ import { loadWords, isValidWord } from './wordlist.js'
 // ── Config ───────────────────────────────────────────────────────────────────
 const COLS          = 7
 const ROWS          = 10
-const SPAWN_COL     = 3      // 0-indexed center column of 7
-const BASE_INTERVAL = 1000   // ms per auto-drop at game start
+const SPAWN_COL     = 3      // 0-indexed center of 7
+const BASE_INTERVAL = 1000   // ms per auto-drop at start
 const MIN_INTERVAL  = 150    // ms per auto-drop at max speed
-const SPEED_EVERY   = 3      // words cleared before each speed tick
+const SPEED_EVERY   = 3      // words before each speed tick
 const SPEED_REDUCE  = 40     // ms removed per tick
+const GOAL_WORDS    = 5      // words needed to win
+const GOAL_TIME     = 100    // seconds on the clock
 
 // Scrabble-derived letter point values
 const PV = {
@@ -26,8 +28,8 @@ const sb = createClient(
 )
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let board        = []      // board[row][col] = 'A'-'Z' | null
-let active       = null    // { letter, row, col }
+let board        = []
+let active       = null   // { letter, row, col }
 let nextLetter   = null
 let deck         = []
 let deckIdx      = 0
@@ -39,22 +41,21 @@ let animating    = false
 let paused       = false
 let dropMs       = BASE_INTERVAL
 let lastDrop     = 0
+let timeLeft     = GOAL_TIME
+let timerHandle  = null
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
-const loadScreen = $('loading-screen')
-const loadBar    = $('loading-bar')
-const appEl      = $('app')
-const boardEl    = $('board')
-const scoreEl    = $('score')
-const nextEl     = $('next-letter')
-const lastWordEl = $('last-word')
-const overlay    = $('modal-overlay')
-const finalScore = $('final-score')
-const finalWord  = $('final-word')
-const finalCount = $('final-count')
-const nameInput  = $('player-name')
-const lbList     = $('scores-list')
+const loadScreen  = $('loading-screen')
+const loadBar     = $('loading-bar')
+const appEl       = $('app')
+const boardEl     = $('board')
+const scoreEl     = $('score')
+const nextEl      = $('next-letter')
+const lastWordEl  = $('last-word')
+const overlay     = $('modal-overlay')
+const nameInput   = $('player-name')
+const lbList      = $('scores-list')
 
 // ── Deck ──────────────────────────────────────────────────────────────────────
 function freshDeck() {
@@ -69,6 +70,29 @@ function freshDeck() {
 function draw() {
   if (deckIdx >= deck.length) { deck = freshDeck(); deckIdx = 0 }
   return deck[deckIdx++]
+}
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+function updateTimerDisplay() {
+  const t  = Math.max(0, timeLeft)
+  const m  = Math.floor(t / 60)
+  const s  = t % 60
+  const el = $('timer')
+  el.textContent = `${m}:${String(s).padStart(2, '0')}`
+  el.classList.toggle('timer-low', timeLeft <= 10 && timeLeft > 0)
+}
+
+function startTimer() {
+  clearInterval(timerHandle)
+  timerHandle = setInterval(() => {
+    if (!running || paused) return
+    timeLeft--
+    updateTimerDisplay()
+    if (timeLeft <= 0) {
+      clearInterval(timerHandle)
+      endGame('time')
+    }
+  }, 1000)
 }
 
 // ── Board DOM ─────────────────────────────────────────────────────────────────
@@ -104,7 +128,7 @@ function spawn() {
   nextLetter = draw()
   nextEl.textContent = nextLetter
 
-  if (board[0][SPAWN_COL] !== null) { endGame(); return }
+  if (board[0][SPAWN_COL] !== null) { endGame('board'); return }
   active = { letter, row: 0, col: SPAWN_COL }
   lastDrop = performance.now()
   render()
@@ -143,10 +167,11 @@ async function lock() {
   render()
   await cascade()
   animating = false
-  if (running) spawn()
+  if (!running) return                        // timer fired during cascade
+  if (wordsCleared >= GOAL_WORDS) { endGame('win'); return }
+  spawn()
 }
 
-// Repeatedly find, flash, clear, and gravity until no words remain
 async function cascade() {
   while (true) {
     const words = findWords()
@@ -161,7 +186,6 @@ async function cascade() {
 function findWords() {
   const found = []
 
-  // Scan rows (horizontal)
   for (let r = 0; r < ROWS; r++) {
     const str = board[r].map(l => l || ' ').join('')
     scanLine(str, (word, start) => {
@@ -169,7 +193,6 @@ function findWords() {
     })
   }
 
-  // Scan columns (vertical)
   for (let c = 0; c < COLS; c++) {
     const str = board.map(row => row[c] || ' ').join('')
     scanLine(str, (word, start) => {
@@ -180,8 +203,7 @@ function findWords() {
   return found
 }
 
-// For each start position in a string, find the LONGEST valid word.
-// Breaks on spaces (gaps between locked letters).
+// Longest valid word at each start position; breaks on gaps.
 function scanLine(str, cb) {
   for (let s = 0; s < str.length; s++) {
     if (str[s] === ' ') continue
@@ -214,11 +236,10 @@ async function flashClear(words) {
   }
 
   scoreEl.textContent = score
+  $('words-counter').textContent = `${Math.min(wordsCleared, GOAL_WORDS)}/5`
 
-  const banner = words.map(w => w.word).join('  +  ')
-  flashBanner(banner)
+  flashBanner(words.map(w => w.word).join('  +  '))
 
-  // Animate cells
   const dominated = []
   for (const key of hit) {
     const [r, c] = key.split(',').map(Number)
@@ -227,14 +248,13 @@ async function flashClear(words) {
     dominated.push({ el, r, c })
   }
 
-  await sleep(960) // matches CSS: 0.12s × 8 iterations
+  await sleep(960)
 
   for (const { el, r, c } of dominated) {
     el.classList.remove('flash')
     board[r][c] = null
   }
 
-  // Speed up every SPEED_EVERY words
   const level = Math.floor(wordsCleared / SPEED_EVERY)
   dropMs = Math.max(MIN_INTERVAL, BASE_INTERVAL - level * SPEED_REDUCE)
 }
@@ -246,7 +266,6 @@ function gravity() {
     for (let r = 0; r < ROWS; r++) {
       if (board[r][c] !== null) letters.push(board[r][c])
     }
-    // Pack letters to the bottom; top rows become null
     for (let r = 0; r < ROWS; r++) {
       const idx = r - (ROWS - letters.length)
       board[r][c] = idx >= 0 ? letters[idx] : null
@@ -269,7 +288,7 @@ function togglePause() {
   paused = !paused
   $('pause-overlay').classList.toggle('hidden', !paused)
   $('btn-pause').textContent = paused ? '▶' : '❚❚'
-  if (!paused) lastDrop = performance.now() // don't penalise unpause with instant drop
+  if (!paused) lastDrop = performance.now()
 }
 
 // ── Game loop ─────────────────────────────────────────────────────────────────
@@ -282,17 +301,39 @@ function loop(ts) {
   requestAnimationFrame(loop)
 }
 
-// ── Game over ─────────────────────────────────────────────────────────────────
-async function endGame() {
+// ── End game ─────────────────────────────────────────────────────────────────
+// reason: 'win' | 'time' | 'board'
+async function endGame(reason) {
   running = false
-  finalScore.textContent = score
-  finalWord.textContent  = longestWord || '—'
-  finalCount.textContent = wordsCleared
+  clearInterval(timerHandle)
+
+  const timeUsed = GOAL_TIME - Math.max(0, timeLeft)
+  const wc       = Math.min(wordsCleared, GOAL_WORDS)
+
+  const heading = $('result-heading')
+  const sub     = $('result-sub')
+
+  if (reason === 'win') {
+    heading.textContent = 'YOU WIN!'
+    sub.textContent     = `All 5 words spelled in ${timeUsed} second${timeUsed !== 1 ? 's' : ''}!`
+  } else if (reason === 'time') {
+    heading.textContent = "TIME'S UP"
+    sub.textContent     = `${wc} of 5 words spelled before time ran out.`
+  } else {
+    heading.textContent = 'BOARD FULL'
+    sub.textContent     = `${wc} of 5 words spelled before the board filled.`
+  }
+
+  $('final-score').textContent = score
+  $('final-time').textContent  = `${timeUsed}s`
+  $('final-count').textContent = `${wc} / 5`
+  $('final-word').textContent  = longestWord || '—'
+
   await loadLB()
   overlay.classList.remove('hidden')
 }
 
-// ── Supabase helpers ──────────────────────────────────────────────────────────
+// ── Supabase ──────────────────────────────────────────────────────────────────
 async function saveScore(name) {
   try {
     await sb.from('scores').insert({
@@ -301,7 +342,7 @@ async function saveScore(name) {
       longest_word:  longestWord || null,
       words_spelled: wordsCleared
     })
-  } catch { /* swallow — leaderboard is bonus, not required */ }
+  } catch {}
   await loadLB()
 }
 
@@ -319,7 +360,7 @@ async function loadLB() {
         <span class="lb-word">${s.longest_word || ''}</span>
         <span>${s.score}</span>
       </li>`).join('')
-  } catch { /* leaderboard failure is non-fatal */ }
+  } catch {}
 }
 
 // ── Start / Restart ───────────────────────────────────────────────────────────
@@ -334,9 +375,12 @@ function startGame() {
   dropMs       = BASE_INTERVAL
   animating    = false
   paused       = false
+  timeLeft     = GOAL_TIME
   running      = true
 
   scoreEl.textContent = 0
+  $('words-counter').textContent = '0/5'
+  updateTimerDisplay()
   lastWordEl.classList.remove('visible')
   overlay.classList.add('hidden')
   $('pause-overlay').classList.add('hidden')
@@ -345,12 +389,12 @@ function startGame() {
   buildGrid()
   nextLetter = draw()
   spawn()
+  startTimer()
   requestAnimationFrame(loop)
 }
 
-// ── Input: touch hold-repeat ──────────────────────────────────────────────────
+// ── Input ─────────────────────────────────────────────────────────────────────
 let holdT = null, holdI = null
-
 function startHold(fn) {
   fn()
   holdT = setTimeout(() => { holdI = setInterval(fn, 80) }, 220)
@@ -359,11 +403,10 @@ function stopHold() {
   clearTimeout(holdT); clearInterval(holdI)
   holdT = null; holdI = null
 }
-
 function bindBtn(id, fn) {
-  const el = $(id)
-  el.addEventListener('pointerdown', e => { e.preventDefault(); startHold(fn) })
+  $(id).addEventListener('pointerdown', e => { e.preventDefault(); startHold(fn) })
 }
+
 document.addEventListener('pointerup',     stopHold)
 document.addEventListener('pointercancel', stopHold)
 
@@ -371,22 +414,18 @@ bindBtn('btn-left',  moveLeft)
 bindBtn('btn-right', moveRight)
 bindBtn('btn-down',  moveDown)
 
-// Pause is a simple tap — no hold-repeat
 $('btn-pause').addEventListener('pointerdown', e => { e.preventDefault(); togglePause() })
 
-// Suppress Chrome Android's long-press context menu on the whole page
 document.addEventListener('contextmenu', e => e.preventDefault())
 
-// Keyboard fallback (desktop / keyboard-connected tablet)
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft')  { e.preventDefault(); moveLeft()    }
-  if (e.key === 'ArrowRight') { e.preventDefault(); moveRight()   }
-  if (e.key === 'ArrowDown')  { e.preventDefault(); moveDown()    }
-  if (e.key === ' ')          { e.preventDefault(); moveDown()    }
+  if (e.key === 'ArrowLeft')               { e.preventDefault(); moveLeft()    }
+  if (e.key === 'ArrowRight')              { e.preventDefault(); moveRight()   }
+  if (e.key === 'ArrowDown')               { e.preventDefault(); moveDown()    }
+  if (e.key === ' ')                       { e.preventDefault(); moveDown()    }
   if (e.key === 'p' || e.key === 'Escape') { e.preventDefault(); togglePause() }
 })
 
-// Modal actions
 $('btn-submit').addEventListener('click', async () => {
   const btn = $('btn-submit')
   btn.disabled = true; btn.textContent = '...'
