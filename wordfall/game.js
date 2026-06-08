@@ -6,13 +6,20 @@ import { loadWords, isValidWord } from './wordlist.js'
 // ── Config ───────────────────────────────────────────────────────────────────
 const COLS          = 7
 const ROWS          = 10
-const SPAWN_COL     = 3      // 0-indexed center of 7
-const BASE_INTERVAL = 1000   // ms per auto-drop at start
-const MIN_INTERVAL  = 150    // ms per auto-drop at max speed
-const SPEED_EVERY   = 3      // words before each speed tick
-const SPEED_REDUCE  = 40     // ms removed per tick
-const GOAL_WORDS    = 3      // words needed to win
-const GOAL_TIME     = 90     // seconds on the clock
+const SPAWN_COL     = 3
+const BASE_INTERVAL = 1000
+const MIN_INTERVAL  = 150
+const SPEED_EVERY   = 3
+const SPEED_REDUCE  = 40
+
+const LEVELS = [
+  { words: 1,  time: 60  },   // Level 1
+  { words: 3,  time: 90  },   // Level 2
+  { words: 5,  time: 120 },   // Level 3
+  { words: 7,  time: 120 },   // Level 4
+  { words: 10, time: 180 },   // Level 5
+]
+const lvl = () => LEVELS[currentLevel]
 
 // Scrabble-derived letter point values
 const PV = {
@@ -33,6 +40,7 @@ let active       = null   // { letter, row, col }
 let nextLetter   = null
 let deck         = []
 let deckIdx      = 0
+let currentLevel = 0
 let score        = 0
 let wordsCleared = 0
 let longestWord  = ''
@@ -42,30 +50,28 @@ let animating    = false
 let paused       = false
 let dropMs       = BASE_INTERVAL
 let lastDrop     = 0
-let timeLeft     = GOAL_TIME
+let timeLeft     = 0
 let timerHandle  = null
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
-const loadScreen  = $('loading-screen')
-const loadBar     = $('loading-bar')
-const appEl       = $('app')
-const boardEl     = $('board')
-const scoreEl     = $('score')
-const nextEl      = $('next-letter')
-const lastWordEl  = $('last-word')
-const overlay     = $('modal-overlay')
-const nameInput   = $('player-name')
-const lbList      = $('scores-list')
+const loadScreen = $('loading-screen')
+const loadBar    = $('loading-bar')
+const appEl      = $('app')
+const boardEl    = $('board')
+const scoreEl    = $('score')
+const nextEl     = $('next-letter')
+const lastWordEl = $('last-word')
+const overlay    = $('modal-overlay')
+const nameInput  = $('player-name')
+const lbList     = $('scores-list')
 
 // ── Deck ──────────────────────────────────────────────────────────────────────
-// Consonant-only deck (Y treated as vowel, excluded). Every 4th draw is a
-// random vowel so the player always has vowels to work with, but consonants
-// never repeat within a cycle.
+// Consonant-only cycle; every 4th draw is a random vowel (A/E/I/O/U).
 const VOWELS     = ['A','E','I','O','U']
-const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXZ'.split('')  // 20 letters
+const CONSONANTS = 'BCDFGHJKLMNPQRSTVWXZ'.split('')
 
-let drawCount = 0   // resets each game; drives the every-4th vowel rule
+let drawCount = 0
 
 function freshDeck() {
   const a = [...CONSONANTS]
@@ -78,9 +84,7 @@ function freshDeck() {
 
 function draw() {
   drawCount++
-  if (drawCount % 4 === 0) {
-    return VOWELS[Math.floor(Math.random() * VOWELS.length)]
-  }
+  if (drawCount % 4 === 0) return VOWELS[Math.floor(Math.random() * VOWELS.length)]
   if (deckIdx >= deck.length) { deck = freshDeck(); deckIdx = 0 }
   return deck[deckIdx++]
 }
@@ -101,10 +105,7 @@ function startTimer() {
     if (!running || paused) return
     timeLeft--
     updateTimerDisplay()
-    if (timeLeft <= 0) {
-      clearInterval(timerHandle)
-      endGame('time')
-    }
+    if (timeLeft <= 0) { clearInterval(timerHandle); endGame('time') }
   }, 1000)
 }
 
@@ -140,7 +141,6 @@ function spawn() {
   const letter = nextLetter || draw()
   nextLetter = draw()
   nextEl.textContent = nextLetter
-
   if (board[0][SPAWN_COL] !== null) { endGame('board'); return }
   active = { letter, row: 0, col: SPAWN_COL }
   lastDrop = performance.now()
@@ -153,16 +153,12 @@ function canDown() {
 
 function moveLeft() {
   if (!active || animating || paused) return
-  if (active.col > 0 && board[active.row][active.col - 1] === null) {
-    active.col--; render()
-  }
+  if (active.col > 0 && board[active.row][active.col - 1] === null) { active.col--; render() }
 }
 
 function moveRight() {
   if (!active || animating || paused) return
-  if (active.col < COLS - 1 && board[active.row][active.col + 1] === null) {
-    active.col++; render()
-  }
+  if (active.col < COLS - 1 && board[active.row][active.col + 1] === null) { active.col++; render() }
 }
 
 function moveDown() {
@@ -180,8 +176,8 @@ async function lock() {
   render()
   await cascade()
   animating = false
-  if (!running) return                        // timer fired during cascade
-  if (wordsCleared >= GOAL_WORDS) { endGame('win'); return }
+  if (!running) return
+  if (wordsCleared >= lvl().words) { endGame('win'); return }
   spawn()
 }
 
@@ -198,25 +194,17 @@ async function cascade() {
 // ── Word detection ────────────────────────────────────────────────────────────
 function findWords() {
   const found = []
-
   for (let r = 0; r < ROWS; r++) {
     const str = board[r].map(l => l || ' ').join('')
-    scanLine(str, (word, start) => {
-      found.push({ word, cells: wordCells(word, r, start, 'h') })
-    })
+    scanLine(str, (word, start) => found.push({ word, cells: wordCells(word, r, start, 'h') }))
   }
-
   for (let c = 0; c < COLS; c++) {
     const str = board.map(row => row[c] || ' ').join('')
-    scanLine(str, (word, start) => {
-      found.push({ word, cells: wordCells(word, start, c, 'v') })
-    })
+    scanLine(str, (word, start) => found.push({ word, cells: wordCells(word, start, c, 'v') }))
   }
-
   return found
 }
 
-// Longest valid word at each start position; breaks on gaps.
 function scanLine(str, cb) {
   for (let s = 0; s < str.length; s++) {
     if (str[s] === ' ') continue
@@ -250,9 +238,8 @@ async function flashClear(words) {
   }
 
   scoreEl.textContent = score
-  $('words-counter').textContent = `${Math.min(wordsCleared, GOAL_WORDS)}/3`
+  $('words-counter').textContent = `${Math.min(wordsCleared, lvl().words)}/${lvl().words}`
   renderWordList()
-
   flashBanner(words.map(w => w.word).join('  +  '))
 
   const dominated = []
@@ -269,9 +256,32 @@ async function flashClear(words) {
     el.classList.remove('flash')
     board[r][c] = null
   }
+  spawnExplosion(dominated)
 
-  const level = Math.floor(wordsCleared / SPEED_EVERY)
-  dropMs = Math.max(MIN_INTERVAL, BASE_INTERVAL - level * SPEED_REDUCE)
+  const speedLevel = Math.floor(wordsCleared / SPEED_EVERY)
+  dropMs = Math.max(MIN_INTERVAL, BASE_INTERVAL - speedLevel * SPEED_REDUCE)
+}
+
+// ── Explosion particles ───────────────────────────────────────────────────────
+function spawnExplosion(cells) {
+  const N = 8
+  for (const { el } of cells) {
+    const rect = el.getBoundingClientRect()
+    const cx   = rect.left + rect.width  / 2
+    const cy   = rect.top  + rect.height / 2
+    for (let i = 0; i < N; i++) {
+      const p     = document.createElement('div')
+      p.className = 'particle'
+      const angle = (i / N) * Math.PI * 2 + Math.random() * 0.5
+      const dist  = 14 + Math.random() * 18
+      p.style.left = cx + 'px'
+      p.style.top  = cy + 'px'
+      p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`)
+      p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`)
+      document.body.appendChild(p)
+      setTimeout(() => p.remove(), 500)
+    }
+  }
 }
 
 // ── Gravity ───────────────────────────────────────────────────────────────────
@@ -323,36 +333,47 @@ function loop(ts) {
   requestAnimationFrame(loop)
 }
 
-// ── End game ─────────────────────────────────────────────────────────────────
-// reason: 'win' | 'time' | 'board'
+// ── End game ──────────────────────────────────────────────────────────────────
 async function endGame(reason) {
   running = false
   clearInterval(timerHandle)
 
-  const timeUsed = GOAL_TIME - Math.max(0, timeLeft)
-  const wc       = Math.min(wordsCleared, GOAL_WORDS)
+  const timeUsed = lvl().time - Math.max(0, timeLeft)
+  const wc       = Math.min(wordsCleared, lvl().words)
+  const levelWin = reason === 'win'
+  const finalWin = levelWin && currentLevel === LEVELS.length - 1
+  const endOfRun = !levelWin || finalWin
 
   const heading = $('result-heading')
   const sub     = $('result-sub')
 
-  if (reason === 'win') {
+  if (finalWin) {
     heading.textContent = 'YOU WIN!'
-    sub.textContent     = `All 3 words spelled in ${timeUsed} second${timeUsed !== 1 ? 's' : ''}!`
+    sub.textContent     = 'All 5 levels complete!'
+  } else if (levelWin) {
+    heading.textContent = `LEVEL ${currentLevel + 1} COMPLETE`
+    sub.textContent     = `Get ready for Level ${currentLevel + 2}...`
   } else if (reason === 'time') {
     heading.textContent = "TIME'S UP"
-    sub.textContent     = `${wc} of 3 words spelled before time ran out.`
+    sub.textContent     = `Level ${currentLevel + 1} — ${wc} of ${lvl().words} word${lvl().words !== 1 ? 's' : ''} spelled.`
   } else {
     heading.textContent = 'BOARD FULL'
-    sub.textContent     = `${wc} of 3 words spelled before the board filled.`
+    sub.textContent     = `Level ${currentLevel + 1} — ${wc} of ${lvl().words} word${lvl().words !== 1 ? 's' : ''} spelled.`
   }
 
   $('final-score').textContent = score
   $('final-time').textContent  = `${timeUsed}s`
-  $('final-count').textContent = `${wc} / 3`
+  $('final-count').textContent = `${wc} / ${lvl().words}`
   $('final-word').textContent  = longestWord || '—'
+  $('final-level').textContent = `${currentLevel + 1} / ${LEVELS.length}`
   $('modal-words').innerHTML   = spelledWords.map(w => `<span class="mw-badge">${w}</span>`).join('')
 
-  await loadLB()
+  $('name-section').style.display   = endOfRun ? '' : 'none'
+  $('lb-section').style.display     = endOfRun ? '' : 'none'
+  $('btn-restart').style.display    = endOfRun ? '' : 'none'
+  $('btn-next-level').style.display = levelWin && !finalWin ? '' : 'none'
+
+  if (endOfRun) await loadLB()
   overlay.classList.remove('hidden')
 }
 
@@ -386,26 +407,23 @@ async function loadLB() {
   } catch {}
 }
 
-// ── Start / Restart ───────────────────────────────────────────────────────────
-function startGame() {
+// ── Start / Level ─────────────────────────────────────────────────────────────
+function startLevel() {
   board        = Array.from({ length: ROWS }, () => Array(COLS).fill(null))
   active       = null
   deck         = freshDeck()
   deckIdx      = 0
   drawCount    = 0
-  score        = 0
   wordsCleared = 0
-  longestWord  = ''
-  spelledWords = []
   dropMs       = BASE_INTERVAL
   animating    = false
   paused       = false
-  timeLeft     = GOAL_TIME
+  timeLeft     = lvl().time
   running      = true
 
-  scoreEl.textContent = 0
-  $('words-counter').textContent = '0/3'
-  $('word-list').innerHTML = ''
+  scoreEl.textContent = score
+  $('words-counter').textContent = `0/${lvl().words}`
+  $('level-display').textContent = `LV.${currentLevel + 1}`
   updateTimerDisplay()
   lastWordEl.classList.remove('visible')
   overlay.classList.add('hidden')
@@ -417,6 +435,15 @@ function startGame() {
   spawn()
   startTimer()
   requestAnimationFrame(loop)
+}
+
+function startGame() {
+  currentLevel = 0
+  score        = 0
+  longestWord  = ''
+  spelledWords = []
+  $('word-list').innerHTML = ''
+  startLevel()
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────────
@@ -464,6 +491,11 @@ $('btn-restart').addEventListener('click', () => {
   $('btn-submit').disabled = false
   $('btn-submit').textContent = 'SAVE'
   startGame()
+})
+
+$('btn-next-level').addEventListener('click', () => {
+  currentLevel++
+  startLevel()
 })
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

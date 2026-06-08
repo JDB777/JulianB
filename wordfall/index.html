@@ -13,7 +13,7 @@
     <div id="loading-inner">
       <div id="loading-title">WORDFALL</div>
       <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-      <div id="loading-label">SPELL 3 WORDS IN 90 SECONDS!</div>
+      <div id="loading-label">5 LEVELS — HOW FAR CAN YOU GO?</div>
     </div>
   </div>
 
@@ -24,13 +24,13 @@
       <div id="hdr-left">
         <button id="btn-pause" class="ctrl-btn" aria-label="Pause">&#9646;&#9646;</button>
         <div class="hdr-col">
-          <div id="timer">1:30</div>
+          <div id="timer">1:00</div>
           <div class="stat-label">TIME</div>
         </div>
       </div>
       <h1 id="title">WORDFALL</h1>
       <div class="hdr-col hdr-right">
-        <div id="words-counter">0/3</div>
+        <div id="words-counter">0/1</div>
         <div class="stat-label">WORDS</div>
       </div>
     </header>
@@ -40,6 +40,10 @@
       <div id="score-block">
         <div class="stat-label">SCORE</div>
         <div id="score">0</div>
+      </div>
+      <div id="level-block">
+        <div class="stat-label">LEVEL</div>
+        <div id="level-display">LV.1</div>
       </div>
       <div id="next-block">
         <div class="stat-label">NEXT</div>
@@ -68,9 +72,10 @@
           <h2 id="result-heading">GAME OVER</h2>
           <p  id="result-sub"></p>
           <div id="final-stats">
+            <div class="stat-row"><span>LEVEL REACHED</span> <strong id="final-level">1 / 5</strong></div>
             <div class="stat-row"><span>SCORE</span>         <strong id="final-score">0</strong></div>
             <div class="stat-row"><span>TIME USED</span>     <strong id="final-time">—</strong></div>
-            <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/3</strong></div>
+            <div class="stat-row"><span>WORDS SPELLED</span> <strong id="final-count">0/1</strong></div>
             <div class="stat-row"><span>LONGEST WORD</span>  <strong id="final-word">—</strong></div>
           </div>
           <div id="modal-words-section">
@@ -87,6 +92,7 @@
             <ol id="scores-list"></ol>
           </div>
           <button id="btn-restart">PLAY AGAIN</button>
+          <button id="btn-next-level">NEXT LEVEL</button>
         </div>
       </div>
     </div>
