@@ -17,6 +17,51 @@
     </div>
   </div>
 
+  <!-- ── Main Menu ────────────────────────────────────── -->
+  <div id="main-menu" class="hidden">
+    <h1 id="menu-title">WORDFALL</h1>
+    <nav id="menu-nav">
+      <button class="menu-btn" id="btn-start">START THE GAME</button>
+      <button class="menu-btn" id="btn-rules">SEE THE RULES</button>
+      <button class="menu-btn" id="btn-scores">HIGH SCORERS</button>
+    </nav>
+  </div>
+
+  <!-- ── Rules Screen ─────────────────────────────────── -->
+  <div id="rules-screen" class="hidden">
+    <div id="rules-inner">
+      <button class="back-btn" id="back-from-rules">&#9664; MENU</button>
+      <h2 class="screen-title">THE RULES</h2>
+      <ul id="rules-list">
+        <li>Spell words with <strong>3 or more letters</strong></li>
+        <li>Words can go left to right or top to bottom</li>
+        <li>Intersecting words all count — score them all</li>
+        <li>You lose when <strong>time runs out</strong></li>
+        <li>You lose when <strong>letters stack too high</strong></li>
+        <li>High-value letters score more — aim for J, Q, X, Z</li>
+      </ul>
+      <div class="screen-divider"></div>
+      <h3 class="screen-sub">LETTER VALUES</h3>
+      <div id="rules-letter-grid">
+        <span>A<small>1</small></span><span>B<small>3</small></span><span>C<small>3</small></span><span>D<small>2</small></span><span>E<small>1</small></span>
+        <span>F<small>4</small></span><span>G<small>2</small></span><span>H<small>4</small></span><span>I<small>1</small></span><span>J<small>8</small></span>
+        <span>K<small>5</small></span><span>L<small>1</small></span><span>M<small>3</small></span><span>N<small>1</small></span><span>O<small>1</small></span>
+        <span>P<small>3</small></span><span>Q<small>10</small></span><span>R<small>1</small></span><span>S<small>1</small></span><span>T<small>1</small></span>
+        <span>U<small>1</small></span><span>V<small>4</small></span><span>W<small>4</small></span><span>X<small>8</small></span><span>Y<small>4</small></span>
+        <span>Z<small>10</small></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── High Scorers Screen ──────────────────────────── -->
+  <div id="scores-screen" class="hidden">
+    <div id="scores-inner">
+      <button class="back-btn" id="back-from-scores">&#9664; MENU</button>
+      <h2 class="screen-title">HIGH SCORERS</h2>
+      <div id="menu-scores-list"><div class="scores-loading">LOADING...</div></div>
+    </div>
+  </div>
+
   <div id="app" class="hidden">
 
     <!-- Row 1: [pause | timer] | title | words -->
@@ -93,6 +138,7 @@
           </div>
           <button id="btn-restart">PLAY AGAIN</button>
           <button id="btn-next-level">NEXT LEVEL</button>
+          <button id="btn-menu">MAIN MENU</button>
         </div>
       </div>
     </div>

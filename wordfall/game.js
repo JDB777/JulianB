@@ -446,6 +446,41 @@ function startGame() {
   startLevel()
 }
 
+// ── Menu screens ──────────────────────────────────────────────────────────────
+function showMenu() {
+  running = false
+  clearInterval(timerHandle)
+  appEl.classList.add('hidden')
+  $('main-menu').classList.remove('hidden')
+  $('rules-screen').classList.add('hidden')
+  $('scores-screen').classList.add('hidden')
+}
+
+async function loadMenuScores() {
+  const list = $('menu-scores-list')
+  list.innerHTML = '<div class="scores-loading">LOADING...</div>'
+  try {
+    const { data } = await sb
+      .from('scores')
+      .select('player_name, score, longest_word')
+      .order('score', { ascending: false })
+      .limit(10)
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div class="scores-loading">NO SCORES YET — BE THE FIRST!</div>'
+      return
+    }
+    const sizes = ['2rem', '1.6rem', '1.3rem']
+    list.innerHTML = data.map((s, i) => `
+      <div class="menu-score-entry" style="font-size:${sizes[i] || '0.85rem'}">
+        <span class="mse-rank">${i + 1}.</span>
+        <span class="mse-name">${s.player_name}</span>
+        <span class="mse-score">${s.score}</span>
+      </div>`).join('')
+  } catch {
+    list.innerHTML = '<div class="scores-loading">COULD NOT LOAD SCORES</div>'
+  }
+}
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 let holdT = null, holdI = null
 function startHold(fn) {
@@ -498,11 +533,42 @@ $('btn-next-level').addEventListener('click', () => {
   startLevel()
 })
 
+$('btn-menu').addEventListener('click', () => {
+  overlay.classList.add('hidden')
+  showMenu()
+})
+
+$('btn-start').addEventListener('click', () => {
+  $('main-menu').classList.add('hidden')
+  appEl.classList.remove('hidden')
+  startGame()
+})
+
+$('btn-rules').addEventListener('click', () => {
+  $('main-menu').classList.add('hidden')
+  $('rules-screen').classList.remove('hidden')
+})
+
+$('btn-scores').addEventListener('click', async () => {
+  $('main-menu').classList.add('hidden')
+  $('scores-screen').classList.remove('hidden')
+  await loadMenuScores()
+})
+
+$('back-from-rules').addEventListener('click', () => {
+  $('rules-screen').classList.add('hidden')
+  showMenu()
+})
+
+$('back-from-scores').addEventListener('click', () => {
+  $('scores-screen').classList.add('hidden')
+  showMenu()
+})
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 ;(async () => {
   await loadWords(pct => { loadBar.style.width = `${pct}%` })
   await sleep(250)
   loadScreen.style.display = 'none'
-  appEl.classList.remove('hidden')
-  startGame()
+  showMenu()
 })()
