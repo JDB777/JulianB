@@ -442,78 +442,7 @@ function findClusters(rows) {
   return clusters
 }
 
-// ── Data loading ───────────────────────────────────────────────────────────
-
-window.loadData = async function () {
-  const days = parseInt(document.getElementById('f-days').value)
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const sinceStr = since.toISOString().split('T')[0]
-
-  document.getElementById('tbody').innerHTML =
-    '<tr><td colspan="11"><div class="state-msg">Loading...</div></td></tr>'
-
-  try {
-    const { data, error } = await sb
-      .from('form4_filings')
-      .select('*')
-      .gte('filing_date', sinceStr)
-      .order('filing_date', { ascending: false })
-      .limit(5000)
-
-    if (error) throw error
-
-    allRows = (data || []).map(r => ({ ...r, _signal: signalScore(r) }))
-
-    const now = new Date().toLocaleString('en-US', {
-      month: 'short', day: 'numeric',
-      hour: 'numeric', minute: '2-digit'
-    })
-    document.getElementById('last-updated').textContent = `Updated ${now}`
-
-    applyFilters()
-  } catch (e) {
-    document.getElementById('tbody').innerHTML =
-      `<tr><td colspan="11"><div class="state-msg">Error loading data.<p>${e.message}</p></div></td></tr>`
-  }
-}
-
-// ── Filters ────────────────────────────────────────────────────────────────
-
-window.applyFilters = function () {
-  const action = document.getElementById('f-action').value
-  const type   = document.getElementById('f-type').value
-  const search = document.getElementById('f-search').value.toLowerCase().trim()
-
-  let rows = allRows
-
-  if (action)      rows = rows.filter(r => r.action === action)
-  if (type)        rows = rows.filter(r => r.transaction_type === type)
-  if (signalOnly)  rows = rows.filter(r => r._signal >= 4)
-  if (search) {
-    rows = rows.filter(r =>
-      (r.company_name || '').toLowerCase().includes(search) ||
-      (r.ticker || '').toLowerCase().includes(search)
-    )
-  }
-
-  updateStats(rows)
-  updateClusters(rows)
-  renderTable(rows)
-}
-
 // ── Stats ──────────────────────────────────────────────────────────────────
-
-function updateStats(rows) {
-  const buys   = rows.filter(r => r.action === 'Bought')
-  const sells  = rows.filter(r => r.action === 'Sold')
-  const volume = buys.reduce((s, r) => s + (r.total_value || 0), 0)
-
-  document.getElementById('stat-total').textContent  = rows.length.toLocaleString()
-  document.getElementById('stat-buys').textContent   = buys.length.toLocaleString()
-  document.getElementById('stat-sells').textContent  = sells.length.toLocaleString()
-  document.getElementById('stat-value').textContent  = formatLargeValue(volume)
-}
 
 function formatLargeValue(v) {
   if (!v) return '—'
@@ -523,17 +452,23 @@ function formatLargeValue(v) {
   return `$${v.toFixed(0)}`
 }
 
-// ── Cluster bar ────────────────────────────────────────────────────────────
+function updateStats(rows) {
+  const buys   = rows.filter(r => r.action === 'Bought')
+  const sells  = rows.filter(r => r.action === 'Sold')
+  const volume = buys.reduce((s, r) => s + (r.total_value || 0), 0)
+
+  document.getElementById('stat-total').textContent = rows.length.toLocaleString()
+  document.getElementById('stat-buys').textContent  = buys.length.toLocaleString()
+  document.getElementById('stat-sells').textContent = sells.length.toLocaleString()
+  document.getElementById('stat-value').textContent = formatLargeValue(volume)
+}
 
 function updateClusters(rows) {
   const clusters = findClusters(rows)
   const bar   = document.getElementById('cluster-bar')
   const chips = document.getElementById('cluster-chips')
 
-  if (clusters.size === 0) {
-    bar.classList.remove('visible')
-    return
-  }
+  if (clusters.size === 0) { bar.classList.remove('visible'); return }
 
   chips.innerHTML = [...clusters]
     .map(k => `<span class="cluster-chip">📌 ${k}</span>`)
@@ -541,34 +476,13 @@ function updateClusters(rows) {
   bar.classList.add('visible')
 }
 
-// ── Sorting ────────────────────────────────────────────────────────────────
-
-window.sortBy = function (col) {
-  if (sortCol === col) {
-    sortAsc = !sortAsc
-  } else {
-    sortCol = col
-    sortAsc = col !== 'filing_date' && col !== 'signal' && col !== 'total_value'
-  }
-
-  // Update header arrows
-  document.querySelectorAll('thead th').forEach(th => {
-    th.classList.remove('sorted')
-    th.querySelector('.sort-arrow').textContent = '↕'
-  })
-  const active = document.querySelector(`th[data-col="${col}"]`)
-  if (active) {
-    active.classList.add('sorted')
-    active.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓'
-  }
-
-  applyFilters()
-}
-
 // ── Render ─────────────────────────────────────────────────────────────────
 
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function renderTable(rows) {
-  // Sort
   const col = sortCol
   const asc = sortAsc
 
@@ -576,9 +490,8 @@ function renderTable(rows) {
     let av = col === 'signal' ? a._signal : a[col]
     let bv = col === 'signal' ? b._signal : b[col]
 
-    if (av === null || av === undefined) av = ''
-    if (bv === null || bv === undefined) bv = ''
-
+    if (av == null) av = ''
+    if (bv == null) bv = ''
     if (typeof av === 'string') av = av.toLowerCase()
     if (typeof bv === 'string') bv = bv.toLowerCase()
 
@@ -591,13 +504,7 @@ function renderTable(rows) {
   const tbody = document.getElementById('tbody')
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `
-      <tr><td colspan="11">
-        <div class="state-msg">
-          No filings found for these filters.
-          <p>Run form4_to_supabase.py to populate data, then refresh.</p>
-        </div>
-      </td></tr>`
+    tbody.innerHTML = `<tr><td colspan="11"><div class="state-msg">No filings found for these filters.<p>Run form4_to_supabase.py to populate data, then refresh.</p></div></td></tr>`
     return
   }
 
@@ -620,13 +527,11 @@ function renderTable(rows) {
       rowClass = ''
     }
 
-    const ticker = r.ticker || '—'
+    const ticker     = r.ticker || '—'
     const clusterDot = clusters.has(ticker) || clusters.has(r.company_name)
-      ? '<span class="cluster-dot" title="Cluster buy — multiple insiders"></span>'
-      : ''
-
-    const date   = r.filing_date ? r.filing_date.slice(5) : '—'   // MM-DD
-    const shares = r.shares ? Number(r.shares).toLocaleString()   : '—'
+      ? '<span class="cluster-dot" title="Cluster buy — multiple insiders"></span>' : ''
+    const date   = r.filing_date ? r.filing_date.slice(5) : '—'
+    const shares = r.shares ? Number(r.shares).toLocaleString() : '—'
     const price  = r.price_per_share ? `$${Number(r.price_per_share).toFixed(2)}` : '—'
     const total  = r.total_value ? formatLargeValue(r.total_value) : '—'
 
@@ -647,30 +552,98 @@ function renderTable(rows) {
   }).join('')
 }
 
-function esc(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+// ── Core actions (module-scoped so they can call each other freely) ─────────
+
+function applyFilters() {
+  const action = document.getElementById('f-action').value
+  const type   = document.getElementById('f-type').value
+  const search = document.getElementById('f-search').value.toLowerCase().trim()
+
+  let rows = allRows
+  if (action)     rows = rows.filter(r => r.action === action)
+  if (type)       rows = rows.filter(r => r.transaction_type === type)
+  if (signalOnly) rows = rows.filter(r => r._signal >= 4)
+  if (search)     rows = rows.filter(r =>
+    (r.company_name || '').toLowerCase().includes(search) ||
+    (r.ticker || '').toLowerCase().includes(search)
+  )
+
+  updateStats(rows)
+  updateClusters(rows)
+  renderTable(rows)
 }
 
-// ── Toggle ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  const days = parseInt(document.getElementById('f-days').value)
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const sinceStr = since.toISOString().split('T')[0]
 
-window.toggleSignal = function () {
+  document.getElementById('tbody').innerHTML =
+    '<tr><td colspan="11"><div class="state-msg">Loading...</div></td></tr>'
+
+  try {
+    const { data, error } = await sb
+      .from('form4_filings')
+      .select('*')
+      .gte('filing_date', sinceStr)
+      .order('filing_date', { ascending: false })
+      .limit(5000)
+
+    if (error) throw error
+
+    allRows = (data || []).map(r => ({ ...r, _signal: signalScore(r) }))
+
+    document.getElementById('last-updated').textContent = `Updated ${
+      new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    }`
+
+    applyFilters()
+  } catch (e) {
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="11"><div class="state-msg">Error loading data.<p>${e.message}</p></div></td></tr>`
+  }
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortAsc = !sortAsc
+  } else {
+    sortCol = col
+    sortAsc = col !== 'filing_date' && col !== 'signal' && col !== 'total_value'
+  }
+
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sorted')
+    th.querySelector('.sort-arrow').textContent = '↕'
+  })
+  const active = document.querySelector(`th[data-col="${col}"]`)
+  if (active) {
+    active.classList.add('sorted')
+    active.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓'
+  }
+
+  applyFilters()
+}
+
+function toggleSignal() {
   signalOnly = !signalOnly
   document.getElementById('btn-signal').classList.toggle('active', signalOnly)
   applyFilters()
 }
 
-// ── On date change, reload from Supabase ───────────────────────────────────
+// ── Expose to HTML event handlers ──────────────────────────────────────────
+
+window.loadData     = loadData
+window.applyFilters = applyFilters
+window.sortBy       = sortBy
+window.toggleSignal = toggleSignal
+
+// ── Event listeners & init ─────────────────────────────────────────────────
 
 document.getElementById('f-days').addEventListener('change', loadData)
 
-// ── Init ───────────────────────────────────────────────────────────────────
-
 loadData()
-
-// Auto-refresh every 5 minutes
 setInterval(loadData, 5 * 60 * 1000)
 </script>
 </body>
