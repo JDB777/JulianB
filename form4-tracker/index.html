@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form 4 Insider Tracker</title>
+<style>
+  :root {
+    --bg:         #080c14;
+    --surface:    #0f1623;
+    --surface2:   #1a2235;
+    --border:     #1e2d45;
+    --text:       #e2e8f0;
+    --text2:      #64748b;
+    --green:      #22c55e;
+    --green-dim:  rgba(34,197,94,0.12);
+    --red:        #ef4444;
+    --red-dim:    rgba(239,68,68,0.12);
+    --blue:       #38bdf8;
+    --gold:       #f59e0b;
+    --gold-dim:   rgba(245,158,11,0.15);
+    --purple:     #a78bfa;
+    --radius:     6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .header-left p {
+    color: var(--text2);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .last-updated {
+    color: var(--text2);
+    font-size: 11px;
+  }
+  .btn-refresh {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s;
+  }
+  .btn-refresh:hover { background: var(--border); }
+
+  /* ── Stats ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-card {
+    background: var(--surface);
+    padding: 16px 20px;
+  }
+  .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+  }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red   { color: var(--red); }
+  .stat-value.gold  { color: var(--gold); }
+  .stat-label {
+    color: var(--text2);
+    font-size: 11px;
+    margin-top: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Filters ── */
+  .filters {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filters select,
+  .filters input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filters select:focus,
+  .filters input:focus { border-color: var(--blue); }
+  .filters input[type="text"] { width: 200px; }
+  .filters input::placeholder { color: var(--text2); }
+
+  .toggle-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .toggle-btn.active {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .filter-label {
+    color: var(--text2);
+    font-size: 11px;
+  }
+
+  /* ── Cluster alert ── */
+  .cluster-bar {
+    background: rgba(56,189,248,0.08);
+    border-bottom: 1px solid rgba(56,189,248,0.2);
+    padding: 10px 24px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cluster-bar.visible { display: flex; }
+  .cluster-label { color: var(--blue); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cluster-chip {
+    background: rgba(56,189,248,0.12);
+    border: 1px solid rgba(56,189,248,0.3);
+    color: var(--blue);
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    overflow-x: auto;
+    padding: 0 24px 40px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    min-width: 900px;
+  }
+  thead th {
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 57px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+  thead th.sorted .sort-arrow { opacity: 1; color: var(--blue); }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(30,45,69,0.6);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.buy-row  { background: var(--green-dim); }
+  tbody tr.sell-row { background: var(--red-dim); }
+  tbody tr.buy-row:hover  { background: rgba(34,197,94,0.2); }
+  tbody tr.sell-row:hover { background: rgba(239,68,68,0.2); }
+  tbody tr.high-signal { outline: 1px solid rgba(245,158,11,0.3); outline-offset: -1px; }
+
+  td {
+    padding: 9px 12px;
+    color: var(--text);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  td.wrap { white-space: normal; max-width: 180px; }
+
+  /* Signal column */
+  .signal-high { color: var(--gold);  font-size: 14px; }
+  .signal-med  { color: var(--gold);  font-size: 13px; opacity: 0.8; }
+  .signal-low  { color: var(--gold);  font-size: 12px; opacity: 0.6; }
+  .signal-none { color: var(--text2); font-size: 12px; }
+
+  /* Action badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .badge-buy     { background: rgba(34,197,94,0.15);  color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .badge-sell    { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+  .badge-grant   { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+  .badge-other   { background: rgba(100,116,139,0.15); color: var(--text2); border: 1px solid rgba(100,116,139,0.3); }
+
+  .cluster-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--blue);
+    margin-left: 6px;
+    vertical-align: middle;
+    title: "Cluster buy";
+  }
+
+  .company-cell { font-weight: 600; }
+  .ticker-cell  { color: var(--blue); font-weight: 700; font-family: monospace; font-size: 12px; }
+  .value-cell   { font-family: monospace; font-size: 12px; }
+  .text2        { color: var(--text2); }
+
+  /* Empty / loading states */
+  .state-msg {
+    text-align: center;
+    color: var(--text2);
+    padding: 60px 20px;
+    font-size: 14px;
+  }
+  .state-msg p { margin-top: 8px; font-size: 12px; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .filters { padding: 10px 16px; }
+    .table-wrap { padding: 0 8px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-left">
+    <h1>Form 4 Insider Tracker</h1>
+    <p>SEC EDGAR • Insider transaction filings</p>
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated">Loading...</span>
+    <button class="btn-refresh" onclick="loadData()">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- ── Stats ── -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-total">—</div>
+    <div class="stat-label">Total Filings</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value green" id="stat-buys">—</div>
+    <div class="stat-label">Buy Transactions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value red" id="stat-sells">—</div>
+    <div class="stat-label">Sell Transactions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value gold" id="stat-value">—</div>
+    <div class="stat-label">Total Buy Volume</div>
+  </div>
+</div>
+
+<!-- ── Filters ── -->
+<div class="filters">
+  <span class="filter-label">Period:</span>
+  <select id="f-days" onchange="applyFilters()">
+    <option value="1">Today</option>
+    <option value="7" selected>Last 7 Days</option>
+    <option value="30">Last 30 Days</option>
+    <option value="90">Last 90 Days</option>
+  </select>
+
+  <span class="filter-label">Action:</span>
+  <select id="f-action" onchange="applyFilters()">
+    <option value="">All</option>
+    <option value="Bought">Buys Only</option>
+    <option value="Sold">Sells Only</option>
+  </select>
+
+  <span class="filter-label">Type:</span>
+  <select id="f-type" onchange="applyFilters()">
+    <option value="">All</option>
+    <option value="Open Market Purchase">Open Market Only</option>
+    <option value="Grant / Award">Grants / Awards</option>
+    <option value="Option Exercise">Option Exercises</option>
+  </select>
+
+  <input type="text" id="f-search" placeholder="🔍  Company or ticker..." oninput="applyFilters()">
+
+  <button class="toggle-btn" id="btn-signal" onclick="toggleSignal()">🔥 High Signal Only</button>
+</div>
+
+<!-- ── Cluster alert bar ── -->
+<div class="cluster-bar" id="cluster-bar">
+  <span class="cluster-label">● Cluster Buys</span>
+  <span id="cluster-chips"></span>
+</div>
+
+<!-- ── Table ── -->
+<div class="table-wrap">
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th onclick="sortBy('signal')"    data-col="signal">Signal <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('filing_date')" data-col="filing_date" class="sorted">Date <span class="sort-arrow">↓</span></th>
+        <th onclick="sortBy('company_name')" data-col="company_name">Company <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('ticker')"    data-col="ticker">Ticker <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('insider_name')" data-col="insider_name">Insider <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('insider_role')" data-col="insider_role">Role <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('action')"    data-col="action">Action <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('shares')"    data-col="shares">Shares <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('price_per_share')" data-col="price_per_share">Price <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('total_value')" data-col="total_value">Total Value <span class="sort-arrow">↕</span></th>
+        <th>Type</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="11"><div class="state-msg">Loading filings...</div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+const sb = createClient(
+  'https://oqfjfmthtpqooixcdfyi.supabase.co',
+  'sb_publishable_VvgAKDEdsd3IB3PsHF6Oag_CrBEC7d2'
+)
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+let allRows    = []
+let sortCol    = 'filing_date'
+let sortAsc    = false
+let signalOnly = false
+
+// ── Signal scoring ─────────────────────────────────────────────────────────
+
+function signalScore(row) {
+  if (row.transaction_type !== 'Open Market Purchase') return 0
+  if (row.is_derivative) return 0
+
+  let score = 1
+  const role = (row.insider_role || '').toLowerCase()
+
+  if (role.includes('chief executive') || role.includes(' ceo') || role === 'ceo')
+    score += 3
+  else if (role.includes('chief financial') || role.includes(' cfo') || role === 'cfo')
+    score += 3
+  else if (role.includes('chief') || role.includes('president'))
+    score += 2
+  else if (role.includes('director'))
+    score += 1
+
+  const v = row.total_value || 0
+  if (v >= 5000000) score += 4
+  else if (v >= 1000000) score += 3
+  else if (v >= 500000) score += 2
+  else if (v >= 100000) score += 1
+
+  return Math.min(score, 10)
+}
+
+function signalLabel(score) {
+  if (score >= 7) return { text: '🔥🔥🔥', cls: 'signal-high' }
+  if (score >= 4) return { text: '🔥🔥',   cls: 'signal-med'  }
+  if (score >= 1) return { text: '🔥',     cls: 'signal-low'  }
+  return               { text: '—',       cls: 'signal-none' }
+}
+
+// ── Cluster detection ──────────────────────────────────────────────────────
+
+function findClusters(rows) {
+  const groups = {}
+  rows.forEach(r => {
+    if (r.action === 'Bought' && r.transaction_type === 'Open Market Purchase') {
+      const key = r.ticker || r.company_name || ''
+      if (!groups[key]) groups[key] = new Set()
+      groups[key].add(r.insider_name)
+    }
+  })
+  const clusters = new Set()
+  Object.entries(groups).forEach(([key, names]) => {
+    if (names.size >= 2) clusters.add(key)
+  })
+  return clusters
+}
+
+// ── Data loading ───────────────────────────────────────────────────────────
+
+window.loadData = async function () {
+  const days = parseInt(document.getElementById('f-days').value)
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const sinceStr = since.toISOString().split('T')[0]
+
+  document.getElementById('tbody').innerHTML =
+    '<tr><td colspan="11"><div class="state-msg">Loading...</div></td></tr>'
+
+  try {
+    const { data, error } = await sb
+      .from('form4_filings')
+      .select('*')
+      .gte('filing_date', sinceStr)
+      .order('filing_date', { ascending: false })
+      .limit(5000)
+
+    if (error) throw error
+
+    allRows = (data || []).map(r => ({ ...r, _signal: signalScore(r) }))
+
+    const now = new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    })
+    document.getElementById('last-updated').textContent = `Updated ${now}`
+
+    applyFilters()
+  } catch (e) {
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="11"><div class="state-msg">Error loading data.<p>${e.message}</p></div></td></tr>`
+  }
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+
+window.applyFilters = function () {
+  const action = document.getElementById('f-action').value
+  const type   = document.getElementById('f-type').value
+  const search = document.getElementById('f-search').value.toLowerCase().trim()
+
+  let rows = allRows
+
+  if (action)      rows = rows.filter(r => r.action === action)
+  if (type)        rows = rows.filter(r => r.transaction_type === type)
+  if (signalOnly)  rows = rows.filter(r => r._signal >= 4)
+  if (search) {
+    rows = rows.filter(r =>
+      (r.company_name || '').toLowerCase().includes(search) ||
+      (r.ticker || '').toLowerCase().includes(search)
+    )
+  }
+
+  updateStats(rows)
+  updateClusters(rows)
+  renderTable(rows)
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+
+function updateStats(rows) {
+  const buys   = rows.filter(r => r.action === 'Bought')
+  const sells  = rows.filter(r => r.action === 'Sold')
+  const volume = buys.reduce((s, r) => s + (r.total_value || 0), 0)
+
+  document.getElementById('stat-total').textContent  = rows.length.toLocaleString()
+  document.getElementById('stat-buys').textContent   = buys.length.toLocaleString()
+  document.getElementById('stat-sells').textContent  = sells.length.toLocaleString()
+  document.getElementById('stat-value').textContent  = formatLargeValue(volume)
+}
+
+function formatLargeValue(v) {
+  if (!v) return '—'
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`
+  return `$${v.toFixed(0)}`
+}
+
+// ── Cluster bar ────────────────────────────────────────────────────────────
+
+function updateClusters(rows) {
+  const clusters = findClusters(rows)
+  const bar   = document.getElementById('cluster-bar')
+  const chips = document.getElementById('cluster-chips')
+
+  if (clusters.size === 0) {
+    bar.classList.remove('visible')
+    return
+  }
+
+  chips.innerHTML = [...clusters]
+    .map(k => `<span class="cluster-chip">📌 ${k}</span>`)
+    .join(' ')
+  bar.classList.add('visible')
+}
+
+// ── Sorting ────────────────────────────────────────────────────────────────
+
+window.sortBy = function (col) {
+  if (sortCol === col) {
+    sortAsc = !sortAsc
+  } else {
+    sortCol = col
+    sortAsc = col !== 'filing_date' && col !== 'signal' && col !== 'total_value'
+  }
+
+  // Update header arrows
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sorted')
+    th.querySelector('.sort-arrow').textContent = '↕'
+  })
+  const active = document.querySelector(`th[data-col="${col}"]`)
+  if (active) {
+    active.classList.add('sorted')
+    active.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓'
+  }
+
+  applyFilters()
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+
+function renderTable(rows) {
+  // Sort
+  const col = sortCol
+  const asc = sortAsc
+
+  const sorted = [...rows].sort((a, b) => {
+    let av = col === 'signal' ? a._signal : a[col]
+    let bv = col === 'signal' ? b._signal : b[col]
+
+    if (av === null || av === undefined) av = ''
+    if (bv === null || bv === undefined) bv = ''
+
+    if (typeof av === 'string') av = av.toLowerCase()
+    if (typeof bv === 'string') bv = bv.toLowerCase()
+
+    if (av < bv) return asc ? -1 : 1
+    if (av > bv) return asc ? 1 : -1
+    return 0
+  })
+
+  const clusters = findClusters(rows)
+  const tbody = document.getElementById('tbody')
+
+  if (sorted.length === 0) {
+    tbody.innerHTML = `
+      <tr><td colspan="11">
+        <div class="state-msg">
+          No filings found for these filters.
+          <p>Run form4_to_supabase.py to populate data, then refresh.</p>
+        </div>
+      </td></tr>`
+    return
+  }
+
+  tbody.innerHTML = sorted.map(r => {
+    const sig    = signalLabel(r._signal)
+    const isHigh = r._signal >= 7
+
+    let actionBadge, rowClass
+    if (r.action === 'Bought' || r.action === 'Acquired') {
+      actionBadge = `<span class="badge badge-buy">${r.action}</span>`
+      rowClass = 'buy-row'
+    } else if (r.action === 'Sold' || r.action === 'Disposed') {
+      actionBadge = `<span class="badge badge-sell">${r.action}</span>`
+      rowClass = 'sell-row'
+    } else if (r.transaction_type?.includes('Grant') || r.transaction_type?.includes('Award')) {
+      actionBadge = `<span class="badge badge-grant">${r.action}</span>`
+      rowClass = ''
+    } else {
+      actionBadge = `<span class="badge badge-other">${r.action || '—'}</span>`
+      rowClass = ''
+    }
+
+    const ticker = r.ticker || '—'
+    const clusterDot = clusters.has(ticker) || clusters.has(r.company_name)
+      ? '<span class="cluster-dot" title="Cluster buy — multiple insiders"></span>'
+      : ''
+
+    const date   = r.filing_date ? r.filing_date.slice(5) : '—'   // MM-DD
+    const shares = r.shares ? Number(r.shares).toLocaleString()   : '—'
+    const price  = r.price_per_share ? `$${Number(r.price_per_share).toFixed(2)}` : '—'
+    const total  = r.total_value ? formatLargeValue(r.total_value) : '—'
+
+    return `
+      <tr class="${rowClass}${isHigh ? ' high-signal' : ''}">
+        <td><span class="${sig.cls}">${sig.text}</span></td>
+        <td class="text2">${date}</td>
+        <td class="company-cell wrap">${esc(r.company_name || '—')}${clusterDot}</td>
+        <td class="ticker-cell">${esc(ticker)}</td>
+        <td class="wrap">${esc(r.insider_name || '—')}</td>
+        <td class="text2 wrap">${esc(r.insider_role || '—')}</td>
+        <td>${actionBadge}</td>
+        <td class="value-cell">${shares}</td>
+        <td class="value-cell">${price}</td>
+        <td class="value-cell" style="font-weight:${r.total_value >= 1e6 ? 600 : 400}">${total}</td>
+        <td class="text2 wrap">${esc(r.transaction_type || '—')}</td>
+      </tr>`
+  }).join('')
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// ── Toggle ─────────────────────────────────────────────────────────────────
+
+window.toggleSignal = function () {
+  signalOnly = !signalOnly
+  document.getElementById('btn-signal').classList.toggle('active', signalOnly)
+  applyFilters()
+}
+
+// ── On date change, reload from Supabase ───────────────────────────────────
+
+document.getElementById('f-days').addEventListener('change', loadData)
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+loadData()
+
+// Auto-refresh every 5 minutes
+setInterval(loadData, 5 * 60 * 1000)
+</script>
+</body>
+</html>
