@@ -615,7 +615,8 @@ function sortBy(col) {
 
   document.querySelectorAll('thead th').forEach(th => {
     th.classList.remove('sorted')
-    th.querySelector('.sort-arrow').textContent = '↕'
+    const arrow = th.querySelector('.sort-arrow')
+    if (arrow) arrow.textContent = '↕'
   })
   const active = document.querySelector(`th[data-col="${col}"]`)
   if (active) {
