@@ -335,7 +335,7 @@
     <option value="60">Last 60 Days</option>
     <option value="90">Last 90 Days</option>
     <option value="ytd">2026 YTD</option>
-    <option value="all" selected>All (since Jan 2025)</option>
+    <option value="all" selected>All (since Jan 2024)</option>
   </select>
 
   <span class="filter-label">Action:</span>
@@ -667,7 +667,7 @@ async function loadData() {
   const val = document.getElementById('f-days').value
   let sinceStr
   if (val === 'all') {
-    sinceStr = '2025-01-01'
+    sinceStr = '2024-01-01'
   } else if (val === 'ytd') {
     sinceStr = new Date().getFullYear() + '-01-01'
   } else {
