@@ -334,8 +334,8 @@
     <option value="30">Last 30 Days</option>
     <option value="60">Last 60 Days</option>
     <option value="90">Last 90 Days</option>
-    <option value="ytd">2026 YTD</option>
-    <option value="all" selected>All (since Jan 2024)</option>
+    <option value="ytd" selected>2026 YTD</option>
+    <option value="all">All (since Jan 2024)</option>
   </select>
 
   <span class="filter-label">Action:</span>
@@ -390,9 +390,13 @@
       </tr>
     </thead>
     <tbody id="tbody">
-      <tr><td colspan="12"><div class="state-msg">Loading filings...</div></td></tr>
+      <tr><td colspan="15"><div class="state-msg">Loading filings...</div></td></tr>
     </tbody>
   </table>
+  <button id="btn-more" class="toggle-btn" onclick="loadMore()"
+          style="display:none;margin:16px auto 0;width:100%;max-width:400px">
+    ⬇ Load more
+  </button>
 </div>
 
 <script type="module">
@@ -404,15 +408,34 @@ const sb = createClient(
 )
 
 // ── State ──────────────────────────────────────────────────────────────────
+// Filtering/search/sort run SERVER-SIDE (the table holds ~1M rows — far too
+// many to download). We fetch only the first PAGE matches + exact counts.
 
-let allRows       = []
+let loadedRows    = []
 let renderedRows  = []
+let totalCount    = 0
+let buysCount     = 0
+let sellsCount    = 0
+let offset        = 0
+let queryEpoch    = 0
 let sortCol       = 'filing_date'
 let sortAsc       = false
 let signalOnly    = false
 let freshOnly     = false
 let backtestMode  = false
 let usOnly        = false
+
+const PAGE = 2000
+const RENDER_MAX = 10000
+
+const SERVER_SORTABLE = new Set([
+  'filing_date', 'company_name', 'ticker', 'insider_name', 'insider_role',
+  'action', 'shares', 'price_per_share', 'total_value', 'exchange'
+])
+
+const COLS = 'filing_date,company_name,ticker,insider_name,insider_role,action,' +
+  'transaction_type,shares,price_per_share,total_value,shares_after,' +
+  'is_derivative,exchange,is_us_listed,price_30d,price_60d,price_90d'
 
 // ── Signal scoring ─────────────────────────────────────────────────────────
 
@@ -577,15 +600,15 @@ function renderTable(rows) {
   const tbody = document.getElementById('tbody')
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12"><div class="state-msg">No filings found for these filters.<p>Run form4_to_supabase.py to populate data, then refresh.</p></div></td></tr>`
+    tbody.innerHTML = `<tr><td colspan="15"><div class="state-msg">No filings found for these filters.</div></td></tr>`
     return
   }
 
-  const RENDER_CAP = 2000
-  const toRender = sorted.slice(0, RENDER_CAP)
+  const toRender = sorted.slice(0, RENDER_MAX)
   renderedRows = toRender
-  const capMsg = sorted.length > RENDER_CAP
-    ? `<tr><td colspan="12" style="text-align:center;color:var(--text2);padding:14px;font-size:11px;border-top:1px solid var(--border)">Showing ${RENDER_CAP.toLocaleString()} of ${sorted.length.toLocaleString()} records — use filters or Signal toggle to narrow down</td></tr>`
+  const remaining = totalCount - loadedRows.length
+  const capMsg = remaining > 0
+    ? `<tr><td colspan="15" style="text-align:center;color:var(--text2);padding:14px;font-size:11px;border-top:1px solid var(--border)">Showing ${toRender.length.toLocaleString()} of ${totalCount.toLocaleString()} matching records — narrow with filters or load more below</td></tr>`
     : ''
 
   tbody.innerHTML = toRender.map((r, idx) => {
@@ -642,78 +665,122 @@ function renderTable(rows) {
 
 // ── Core actions (module-scoped so they can call each other freely) ─────────
 
-function applyFilters() {
-  const action = document.getElementById('f-action').value
-  const type   = document.getElementById('f-type').value
-  const search = document.getElementById('f-search').value.toLowerCase().trim()
-
-  let rows = allRows
-  if (action)     rows = rows.filter(r => r.action === action)
-  if (type)       rows = rows.filter(r => r.transaction_type === type)
-  if (usOnly)     rows = rows.filter(r => r.is_us_listed === true)
-  if (signalOnly) rows = rows.filter(r => r._signal >= 4)
-  if (freshOnly)  rows = rows.filter(r => isFreshMoney(r))
-  if (search)     rows = rows.filter(r =>
-    (r.company_name || '').toLowerCase().includes(search) ||
-    (r.ticker || '').toLowerCase().includes(search)
-  )
-
-  updateStats(rows)
-  updateClusters(rows)
-  renderTable(rows)
+function sinceDate() {
+  const val = document.getElementById('f-days').value
+  if (val === 'all') return '2024-01-01'
+  if (val === 'ytd') return new Date().getFullYear() + '-01-01'
+  const since = new Date()
+  since.setDate(since.getDate() - parseInt(val))
+  return since.toISOString().split('T')[0]
 }
 
-async function loadData() {
-  const val = document.getElementById('f-days').value
-  let sinceStr
-  if (val === 'all') {
-    sinceStr = '2024-01-01'
-  } else if (val === 'ytd') {
-    sinceStr = new Date().getFullYear() + '-01-01'
+// Apply every active filter to a supabase query builder
+function buildFilters(q, actionOverride) {
+  q = q.gte('filing_date', sinceDate())
+  const action = actionOverride !== undefined ? actionOverride : document.getElementById('f-action').value
+  const type   = document.getElementById('f-type').value
+  const search = document.getElementById('f-search').value.trim().replace(/[,()]/g, ' ').trim()
+
+  if (action)     q = q.eq('action', action)
+  if (type)       q = q.eq('transaction_type', type)
+  if (usOnly)     q = q.eq('is_us_listed', true)
+  if (signalOnly) q = q.eq('transaction_type', 'Open Market Purchase').eq('is_derivative', false)
+  if (freshOnly)  q = q.in('action', ['Bought', 'Acquired'])
+                       .not('shares', 'is', null).not('shares_after', 'is', null)
+  if (search)     q = q.or(`company_name.ilike.%${search}%,ticker.ilike.%${search}%`)
+  return q
+}
+
+// Local-only refinements the server can't express exactly
+function applyLocal() {
+  let rows = loadedRows
+  if (signalOnly) rows = rows.filter(r => r._signal >= 4)
+  if (freshOnly)  rows = rows.filter(r => isFreshMoney(r))
+
+  // exact server counts unless a local-only toggle narrowed the loaded set
+  if (signalOnly || freshOnly) updateStats(rows)
+  else updateServerStats(rows)
+  updateClusters(rows)
+  renderTable(rows)
+
+  const btnMore = document.getElementById('btn-more')
+  const more = totalCount - loadedRows.length
+  if (more > 0 && loadedRows.length < RENDER_MAX) {
+    btnMore.style.display = 'block'
+    btnMore.textContent = `⬇ Load ${Math.min(PAGE, more).toLocaleString()} more (${more.toLocaleString()} remaining)`
   } else {
-    const since = new Date()
-    since.setDate(since.getDate() - parseInt(val))
-    sinceStr = since.toISOString().split('T')[0]
+    btnMore.style.display = 'none'
   }
+}
+
+function updateServerStats(rows) {
+  // total from the exact server count; volume from what's loaded
+  document.getElementById('stat-total').textContent = totalCount.toLocaleString()
+  document.getElementById('stat-buys').textContent  = buysCount.toLocaleString()
+  document.getElementById('stat-sells').textContent = sellsCount.toLocaleString()
+  const volume = rows.filter(r => r.action === 'Bought')
+                     .reduce((s, r) => s + (r.total_value || 0), 0)
+  const approx = totalCount > loadedRows.length ? '~' : ''
+  document.getElementById('stat-value').textContent = approx + formatLargeValue(volume)
+}
+
+async function queryData(reset = true) {
+  const epoch = ++queryEpoch
+  if (reset) { offset = 0; loadedRows = [] }
 
   const tbody = document.getElementById('tbody')
-  tbody.innerHTML = '<tr><td colspan="12"><div class="state-msg">Loading...</div></td></tr>'
+  if (reset) tbody.innerHTML = '<tr><td colspan="15"><div class="state-msg">Loading...</div></td></tr>'
 
   try {
-    const PAGE = 1000
-    let allData = []
-    let from = 0
+    const orderCol = SERVER_SORTABLE.has(sortCol) ? sortCol : 'filing_date'
+    const orderAsc = SERVER_SORTABLE.has(sortCol) ? sortAsc : false
 
-    while (true) {
-      const { data, error } = await sb
-        .from('form4_filings')
-        .select('*')
-        .gte('filing_date', sinceStr)
-        .order('filing_date', { ascending: false })
-        .range(from, from + PAGE - 1)
+    let q = buildFilters(sb.from('form4_filings').select(COLS, { count: 'exact' }))
+      .order(orderCol, { ascending: orderAsc, nullsFirst: false })
+      .range(offset, offset + PAGE - 1)
+    if (orderCol !== 'filing_date') q = q.order('filing_date', { ascending: false })
 
-      if (error) throw error
+    const { data, count, error } = await q
+    if (error) throw error
+    if (epoch !== queryEpoch) return   // a newer query superseded this one
 
-      const chunk = data || []
-      allData = allData.concat(chunk)
+    totalCount = count ?? 0
+    loadedRows = loadedRows.concat((data || []).map(r => ({ ...r, _signal: signalScore(r) })))
+    offset += PAGE
 
-      if (chunk.length < PAGE) break
-      from += PAGE
-
-      tbody.innerHTML = `<tr><td colspan="12"><div class="state-msg">Loading... ${allData.length.toLocaleString()} records</div></td></tr>`
+    // buy/sell splits: reuse the total when the action filter decides them
+    const actionFilter = document.getElementById('f-action').value
+    if (actionFilter === 'Bought')      { buysCount = totalCount; sellsCount = 0 }
+    else if (actionFilter === 'Sold')   { buysCount = 0; sellsCount = totalCount }
+    else {
+      const [b, s] = await Promise.all([
+        buildFilters(sb.from('form4_filings').select('filing_date', { count: 'exact', head: true }), 'Bought'),
+        buildFilters(sb.from('form4_filings').select('filing_date', { count: 'exact', head: true }), 'Sold'),
+      ])
+      if (epoch !== queryEpoch) return
+      buysCount  = b.count ?? 0
+      sellsCount = s.count ?? 0
     }
-
-    allRows = allData.map(r => ({ ...r, _signal: signalScore(r) }))
 
     document.getElementById('last-updated').textContent = `Updated ${
       new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    }`
+    } • ${totalCount.toLocaleString()} matching`
 
-    applyFilters()
+    applyLocal()
   } catch (e) {
+    if (epoch !== queryEpoch) return
+    const msg = /timeout/i.test(e.message || '')
+      ? 'Query timed out — this view needs the database indexes from create_indexes.sql (STOCK TRADER THINGIE folder). Try a shorter period meanwhile.'
+      : e.message
     document.getElementById('tbody').innerHTML =
-      `<tr><td colspan="12"><div class="state-msg">Error loading data.<p>${e.message}</p></div></td></tr>`
+      `<tr><td colspan="15"><div class="state-msg">Error loading data.<p>${msg}</p></div></td></tr>`
   }
+}
+
+let debounceTimer = null
+function requery() {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => queryData(true), 300)
 }
 
 function sortBy(col) {
@@ -735,25 +802,27 @@ function sortBy(col) {
     active.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓'
   }
 
-  applyFilters()
+  // real columns re-sort on the server; computed ones sort what's loaded
+  if (SERVER_SORTABLE.has(col)) queryData(true)
+  else applyLocal()
 }
 
 function toggleUsOnly() {
   usOnly = !usOnly
   document.getElementById('btn-us-only').classList.toggle('active', usOnly)
-  applyFilters()
+  queryData(true)
 }
 
 function toggleSignal() {
   signalOnly = !signalOnly
   document.getElementById('btn-signal').classList.toggle('active', signalOnly)
-  applyFilters()
+  queryData(true)
 }
 
 function toggleFresh() {
   freshOnly = !freshOnly
   document.getElementById('btn-fresh').classList.toggle('active', freshOnly)
-  applyFilters()
+  queryData(true)
 }
 
 function toggleBacktest() {
@@ -766,8 +835,9 @@ function toggleBacktest() {
 
 // ── Expose to HTML event handlers ──────────────────────────────────────────
 
-window.loadData       = loadData
-window.applyFilters   = applyFilters
+window.loadData       = () => queryData(true)   // refresh button
+window.applyFilters   = requery                 // selects + search (debounced)
+window.loadMore       = () => queryData(false)
 window.sortBy         = sortBy
 window.toggleUsOnly   = toggleUsOnly
 window.toggleSignal   = toggleSignal
@@ -776,7 +846,7 @@ window.toggleBacktest = toggleBacktest
 
 // ── Event listeners & init ─────────────────────────────────────────────────
 
-document.getElementById('f-days').addEventListener('change', loadData)
+document.getElementById('f-days').addEventListener('change', () => queryData(true))
 
 // Signal tooltip — fixed-position so table overflow can't clip it
 const tipEl = document.createElement('div')
@@ -806,8 +876,8 @@ document.getElementById('tbody').addEventListener('mouseleave', () => {
   tipEl.style.display = 'none'
 })
 
-loadData()
-setInterval(loadData, 5 * 60 * 1000)
+queryData(true)
+setInterval(() => queryData(true), 5 * 60 * 1000)
 </script>
 </body>
 </html>
