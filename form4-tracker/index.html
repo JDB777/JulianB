@@ -335,6 +335,9 @@
     <option value="60">Last 60 Days</option>
     <option value="90">Last 90 Days</option>
     <option value="ytd" selected>2026 YTD</option>
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026">2026</option>
     <option value="all">All (since Jan 2024)</option>
   </select>
 
@@ -669,14 +672,24 @@ function sinceDate() {
   const val = document.getElementById('f-days').value
   if (val === 'all') return '2024-01-01'
   if (val === 'ytd') return new Date().getFullYear() + '-01-01'
+  if (/^\d{4}$/.test(val)) return val + '-01-01'
   const since = new Date()
   since.setDate(since.getDate() - parseInt(val))
   return since.toISOString().split('T')[0]
 }
 
+// Upper bound for filters that cover a fixed calendar year (null = open-ended)
+function untilDate() {
+  const val = document.getElementById('f-days').value
+  if (/^\d{4}$/.test(val)) return val + '-12-31'
+  return null
+}
+
 // Apply every active filter to a supabase query builder
 function buildFilters(q, actionOverride) {
   q = q.gte('filing_date', sinceDate())
+  const until = untilDate()
+  if (until) q = q.lte('filing_date', until)
   const action = actionOverride !== undefined ? actionOverride : document.getElementById('f-action').value
   const type   = document.getElementById('f-type').value
   const search = document.getElementById('f-search').value.trim().replace(/[,()]/g, ' ').trim()
