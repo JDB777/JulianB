@@ -370,6 +370,8 @@
   <button class="toggle-btn" id="btn-signal"      onclick="toggleSignal()">🔥 High Signal Only</button>
   <button class="toggle-btn" id="btn-fresh"       onclick="toggleFresh()">💰 Fresh Money</button>
   <button class="toggle-btn" id="btn-backtest"    onclick="toggleBacktest()">📈 Backtest</button>
+  <button class="toggle-btn" id="btn-strong-buy"  onclick="toggleStrongBuy()">🎯 Strong Buy Signal</button>
+  <button class="toggle-btn" id="btn-sell-alert"  onclick="toggleSellAlert()">⚠️ CEO/CFO Sell Alert</button>
 </div>
 
 <!-- ── Cluster alert bar ── -->
@@ -395,13 +397,14 @@
         <th onclick="sortBy('total_value')" data-col="total_value">Total Value <span class="sort-arrow">↕</span></th>
         <th>Type</th>
         <th onclick="sortBy('exchange')" data-col="exchange">Exchange <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('cluster_count')" data-col="cluster_count" title="Distinct insiders buying this ticker within a trailing 5-day window">Cluster <span class="sort-arrow">↕</span></th>
         <th class="bt-col" style="display:none" onclick="sortBy('price_30d')" data-col="price_30d">30d <span class="sort-arrow">↕</span></th>
         <th class="bt-col" style="display:none" onclick="sortBy('price_60d')" data-col="price_60d">60d <span class="sort-arrow">↕</span></th>
         <th class="bt-col" style="display:none" onclick="sortBy('price_90d')" data-col="price_90d">90d <span class="sort-arrow">↕</span></th>
       </tr>
     </thead>
     <tbody id="tbody">
-      <tr><td colspan="15"><div class="state-msg">Loading filings...</div></td></tr>
+      <tr><td colspan="16"><div class="state-msg">Loading filings...</div></td></tr>
     </tbody>
   </table>
   <button id="btn-more" class="toggle-btn" onclick="loadMore()"
@@ -435,6 +438,8 @@ let signalOnly    = false
 let freshOnly     = false
 let backtestMode  = false
 let usOnly        = false
+let strongBuyOnly = false
+let sellAlertOnly = false
 
 const PAGE = 2000
 const RENDER_MAX = 10000
@@ -446,7 +451,7 @@ const SERVER_SORTABLE = new Set([
 
 const COLS = 'filing_date,company_name,ticker,insider_name,insider_role,action,' +
   'transaction_type,shares,price_per_share,total_value,shares_after,' +
-  'is_derivative,exchange,is_us_listed,price_30d,price_60d,price_90d'
+  'is_derivative,exchange,is_us_listed,price_30d,price_60d,price_90d,cluster_count'
 
 // ── Signal scoring ─────────────────────────────────────────────────────────
 
@@ -473,6 +478,38 @@ function signalScore(row) {
   else if (v >= 100000) score += 1
 
   return Math.min(score, 10)
+}
+
+// Role tier, matching the backtested groupings in insider_strategy_analysis.py
+function isCeoCfoRole(role) {
+  const r = (role || '').toLowerCase()
+  return r.includes('chief executive') || r.includes(' ceo') || r === 'ceo' ||
+         r.includes('chief financial') || r.includes(' cfo') || r === 'cfo'
+}
+function isChiefPresidentRole(role) {
+  const r = (role || '').toLowerCase()
+  return r.includes('chief') || r.includes('president')
+}
+
+// Backtested screen: cluster>=3 distinct insiders (trailing 5 days) + CEO/CFO
+// or Chief/President + $500K+ buy. Replicated across 2024-26 and 2025-26
+// out-of-sample tests: ~30d alpha +12%, ~180d alpha +8%, n=27 each time
+// (small sample - treat as a watchlist trigger, not a sized position on its own).
+function isStrongBuySignal(row) {
+  if (row.action !== 'Bought' || row.transaction_type !== 'Open Market Purchase') return false
+  if (row.is_derivative) return false
+  if ((row.cluster_count || 0) < 3) return false
+  if (!(isCeoCfoRole(row.insider_role) || isChiefPresidentRole(row.insider_role))) return false
+  return (row.total_value || 0) >= 500000
+}
+
+// Backtested screen: CEO/CFO open-market sale of $500K+. The most temporally
+// stable bearish signal found - negative alpha in 7 of 10 quarters tested,
+// getting worse at longer horizons (-3.6% at 30d to -13.8% at 180d, pooled).
+function isSellAlert(row) {
+  if (row.action !== 'Sold' || row.transaction_type !== 'Open Market Sale') return false
+  if (!isCeoCfoRole(row.insider_role)) return false
+  return (row.total_value || 0) >= 500000
 }
 
 // Fresh money: insider had zero (or near-zero) shares before this purchase
@@ -611,7 +648,7 @@ function renderTable(rows) {
   const tbody = document.getElementById('tbody')
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="15"><div class="state-msg">No filings found for these filters.</div></td></tr>`
+    tbody.innerHTML = `<tr><td colspan="16"><div class="state-msg">No filings found for these filters.</div></td></tr>`
     return
   }
 
@@ -619,7 +656,7 @@ function renderTable(rows) {
   renderedRows = toRender
   const remaining = totalCount - loadedRows.length
   const capMsg = remaining > 0
-    ? `<tr><td colspan="15" style="text-align:center;color:var(--text2);padding:14px;font-size:11px;border-top:1px solid var(--border)">Showing ${toRender.length.toLocaleString()} of ${totalCount.toLocaleString()} matching records — narrow with filters or load more below</td></tr>`
+    ? `<tr><td colspan="16" style="text-align:center;color:var(--text2);padding:14px;font-size:11px;border-top:1px solid var(--border)">Showing ${toRender.length.toLocaleString()} of ${totalCount.toLocaleString()} matching records — narrow with filters or load more below</td></tr>`
     : ''
 
   tbody.innerHTML = toRender.map((r, idx) => {
@@ -667,6 +704,7 @@ function renderTable(rows) {
         <td class="value-cell" style="font-weight:${r.total_value >= 1e6 ? 600 : 400}">${total}</td>
         <td class="text2 wrap">${esc(r.transaction_type || '—')}</td>
         <td>${fmtExchange(r.exchange)}</td>
+        <td class="value-cell">${r.cluster_count >= 3 ? `<span style="color:var(--gold);font-weight:600">${r.cluster_count}</span>` : (r.cluster_count ?? '—')}</td>
         <td class="bt-col value-cell" style="display:none">${bt30}</td>
         <td class="bt-col value-cell" style="display:none">${bt60}</td>
         <td class="bt-col value-cell" style="display:none">${bt90}</td>
@@ -717,6 +755,13 @@ function buildFilters(q, actionOverride) {
   if (signalOnly) q = q.eq('transaction_type', 'Open Market Purchase').eq('is_derivative', false)
   if (freshOnly)  q = q.in('action', ['Bought', 'Acquired'])
                        .not('shares', 'is', null).not('shares_after', 'is', null)
+  if (strongBuyOnly)
+    q = q.eq('action', 'Bought').eq('transaction_type', 'Open Market Purchase')
+         .eq('is_derivative', false).gte('total_value', 500000).gte('cluster_count', 3)
+         .or('insider_role.ilike.%chief%,insider_role.ilike.%ceo%,insider_role.ilike.%cfo%,insider_role.ilike.%president%')
+  if (sellAlertOnly)
+    q = q.eq('action', 'Sold').eq('transaction_type', 'Open Market Sale').gte('total_value', 500000)
+         .or('insider_role.ilike.%chief executive%,insider_role.ilike.%ceo%,insider_role.ilike.%chief financial%,insider_role.ilike.%cfo%')
   if (search)     q = q.or(`company_name.ilike.%${search}%,ticker.ilike.%${search}%`)
   return q
 }
@@ -724,11 +769,13 @@ function buildFilters(q, actionOverride) {
 // Local-only refinements the server can't express exactly
 function applyLocal() {
   let rows = loadedRows
-  if (signalOnly) rows = rows.filter(r => r._signal >= 4)
-  if (freshOnly)  rows = rows.filter(r => isFreshMoney(r))
+  if (signalOnly)    rows = rows.filter(r => r._signal >= 4)
+  if (freshOnly)      rows = rows.filter(r => isFreshMoney(r))
+  if (strongBuyOnly) rows = rows.filter(r => isStrongBuySignal(r))
+  if (sellAlertOnly) rows = rows.filter(r => isSellAlert(r))
 
   // exact server counts unless a local-only toggle narrowed the loaded set
-  if (signalOnly || freshOnly) updateStats(rows)
+  if (signalOnly || freshOnly || strongBuyOnly || sellAlertOnly) updateStats(rows)
   else updateServerStats(rows)
   updateClusters(rows)
   renderTable(rows)
@@ -759,7 +806,7 @@ async function queryData(reset = true) {
   if (reset) { offset = 0; loadedRows = [] }
 
   const tbody = document.getElementById('tbody')
-  if (reset) tbody.innerHTML = '<tr><td colspan="15"><div class="state-msg">Loading...</div></td></tr>'
+  if (reset) tbody.innerHTML = '<tr><td colspan="16"><div class="state-msg">Loading...</div></td></tr>'
 
   try {
     const orderCol = SERVER_SORTABLE.has(sortCol) ? sortCol : 'filing_date'
@@ -803,7 +850,7 @@ async function queryData(reset = true) {
       ? 'Query timed out — this view needs the database indexes from create_indexes.sql (STOCK TRADER THINGIE folder). Try a shorter period meanwhile.'
       : e.message
     document.getElementById('tbody').innerHTML =
-      `<tr><td colspan="15"><div class="state-msg">Error loading data.<p>${msg}</p></div></td></tr>`
+      `<tr><td colspan="16"><div class="state-msg">Error loading data.<p>${msg}</p></div></td></tr>`
   }
 }
 
@@ -863,16 +910,30 @@ function toggleBacktest() {
   })
 }
 
+function toggleStrongBuy() {
+  strongBuyOnly = !strongBuyOnly
+  document.getElementById('btn-strong-buy').classList.toggle('active', strongBuyOnly)
+  queryData(true)
+}
+
+function toggleSellAlert() {
+  sellAlertOnly = !sellAlertOnly
+  document.getElementById('btn-sell-alert').classList.toggle('active', sellAlertOnly)
+  queryData(true)
+}
+
 // ── Expose to HTML event handlers ──────────────────────────────────────────
 
-window.loadData       = () => queryData(true)   // refresh button
-window.applyFilters   = requery                 // selects + search (debounced)
-window.loadMore       = () => queryData(false)
-window.sortBy         = sortBy
-window.toggleUsOnly   = toggleUsOnly
-window.toggleSignal   = toggleSignal
-window.toggleFresh    = toggleFresh
-window.toggleBacktest = toggleBacktest
+window.loadData        = () => queryData(true)   // refresh button
+window.applyFilters    = requery                 // selects + search (debounced)
+window.loadMore        = () => queryData(false)
+window.sortBy          = sortBy
+window.toggleUsOnly    = toggleUsOnly
+window.toggleSignal    = toggleSignal
+window.toggleFresh     = toggleFresh
+window.toggleBacktest  = toggleBacktest
+window.toggleStrongBuy = toggleStrongBuy
+window.toggleSellAlert = toggleSellAlert
 
 // ── Event listeners & init ─────────────────────────────────────────────────
 
