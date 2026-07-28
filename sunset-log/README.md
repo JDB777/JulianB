@@ -1,135 +1,175 @@
-# Sunset log
+# Sunset log — Ocean Beach, San Francisco
 
-An observation log of the sunsets worth photographing from Ocean Beach, San Francisco,
-set against what the atmosphere was measurably doing at the time.
+Two things live here:
 
-Live at **https://sunset-log-henna.vercel.app**
+1. **An archive** of San Francisco sunset weather that grows over time and is never
+   re-downloaded. Fetch once, keep forever.
+2. **A predictor** that learns what your favorite evenings have in common and tells you
+   whether the next few are worth walking down for.
+
+The public page is at **https://sunset-log-henna.vercel.app**
 
 Station: 37.7594 N, 122.5107 W, looking west over the Pacific.
 
 ---
 
-## Adding an evening
+## The two commands you will actually use
 
-Put the new photographs in a folder and run one command:
-
-```powershell
-python add_evening.py "C:\path\to\new photos" 2026-08-14
-```
-
-If you know roughly when you took them, say so and it will check you:
+**When you get a sunset you liked:**
 
 ```powershell
-python add_evening.py "C:\path\to\new photos" 2026-08-14 --time 20:03
+python add_favorite.py "C:\path\to\photos" 2026-08-14
 ```
 
-That single command resizes the photographs into `photos/`, measures the sun in each
-frame to work out when it was actually taken, computes the solar geometry, pulls a
-±10 day weather window from Open-Meteo, computes the low-cloud trace and swing with its
-rank, and appends a draft entry to `data/evenings.json`.
+It resizes the photographs in, works out when they were taken by measuring the sun,
+makes sure that evening's weather is in the archive, labels the date, and refreshes the
+website's data file.
 
-It leaves three fields as `TODO` — `type`, `read` and `note` — because those are prose
-written by a person looking at the photograph. It deploys nothing.
-
-Then fill in the prose, and publish:
+**When you want to know whether to bother tonight:**
 
 ```powershell
-python -c "import json;json.load(open(r'data\evenings.json'));print('ok')"
-vercel deploy --prod --cwd C:\Users\Julia\JulianB\sunset-log
-git -C C:\Users\Julia\JulianB add -A
-git -C C:\Users\Julia\JulianB commit -m "Sunset log: add 2026-08-14"
-git -C C:\Users\Julia\JulianB push origin master
+python forecast.py --refresh
 ```
 
-**Pushing to GitHub does not deploy.** There is no git integration on this Vercel
-project. Always do both or the live site and the repo drift apart.
+```
+date          sunset  canvas   slot   score   pctile   verdict
+2026-08-14     20:07      88     91    80.1      96%   exceptional - go
+2026-08-15     20:06      12     44     5.3      31%   unlikely
+```
+
+That is the whole loop. Everything below is detail.
 
 ---
 
-## Why it measures the time from the photograph
+## Why it is built this way
 
-The image files carry **no EXIF at all** — no `DateTimeOriginal`, no GPS, no camera
-model. A stated time therefore cannot be checked against metadata. It can be checked
-against the sun.
+### The archive is the point
 
-The sun's angular diameter is a fixed 0.5333°, so measuring the disk in pixels and its
-height above the horizon in pixels gives the apparent elevation regardless of focal
-length or crop:
+Weather APIs are for fetching, not for storing. Every reading this project has ever
+pulled is kept in `data/sunsets.db`, a single SQLite file, as **raw hourly values rather
+than summaries**. That matters: when a better idea about what makes a good sunset comes
+along in a year's time, it can be applied to the entire history without touching the
+network.
+
+```powershell
+python ingest.py backfill 2025-01-01 2026-07-27   # history, one time
+python ingest.py update                           # catch up, run whenever
+python ingest.py forecast                         # next 7 days
+python store.py                                   # what the archive holds
+```
+
+`ingest.py` only fetches gaps. Running `update` twice does nothing the second time.
+An interrupted backfill resumes where it stopped.
+
+### It samples offshore, not just the beach
+
+The sun sets about 60° further north in June than in December, so "due west" is wrong
+most of the year. The archive samples the station plus **ten offshore points** — five
+bearings from 240° to 300°, at 50 km and 100 km — and features pick the bearing nearest
+each evening's actual sunset azimuth.
+
+This is not decoration. A vivid sunset here needs two separate things:
+
+- **a canvas** — mid and high cloud overhead to catch the light
+- **a slot** — a gap at the western horizon for the light to get through on its way
+
+The station cannot see the slot; it is below the horizon from the beach. Two evenings
+can be identical at the station and completely different 50 km out, and in this archive
+that has already happened: 27 July and 17 July 2026 read 99% and 100% low cloud at the
+station, and 24% against 99% offshore. One was a keeper. The other was not.
+
+The score is `canvas × slot / 100`, so an evening only scores high if **both** are
+present. Overcast with no gap scores zero. An empty clear sky scores zero. That asymmetry
+is why a single "how cloudy is it" number has never worked here.
+
+### Your negatives are real, which is unusual
+
+You see the sunset nearly every evening and send only the ones worth keeping. That makes
+an unlabelled evening inside the watch window a genuine negative — you saw it and it
+wasn't special. Most projects like this have to guess at their negatives; this one
+doesn't, and that is what makes the statistics worth running at all.
+
+If you were away, say so, and the evening is dropped rather than counted against:
+
+```powershell
+python add_favorite.py --unseen 2026-08-20
+```
+
+---
+
+## Finding the trend
+
+```powershell
+python trends.py
+```
+
+Each favorite is scored against evenings within ±15 days of it, so season is controlled
+for by construction — a low-cloud swing of 9 means something very different in March
+than in July, and pooling them is how the previous version of this project fooled itself.
+
+Significance comes from a **circular-shift test**, not a formula: the whole set of
+favorite dates is slid through the archive by a random offset, keeping the spacing
+between them intact, and the statistic is recomputed a few thousand times. Preserving
+spacing matters because your favorites cluster, clustered dates share comparison windows,
+and a test assuming independence would claim confidence it hasn't earned. A
+Benjamini-Hochberg step then accounts for asking the question of nineteen features at
+once.
+
+It will tell you plainly when nothing survives. That is the normal state early on and is
+not a failure — it is the tool refusing to sell you a pattern it cannot support.
+
+`forecast.py` prints a calibration block on every run showing where your known favorites
+landed on the same scale, so you can see whether the score tracks your taste or is
+flattering itself.
+
+---
+
+## What is known so far
+
+**Holds up.** Every evening on record had a clear slot at the western horizon. Across six
+evenings and three seasons there are no exceptions. It is the only claim never to need
+revising, and it is the mechanism the score is built on.
+
+**Falsified.** An earlier statistic — the range of low cloud across the sunset window,
+"swing" — ranked the three July evenings 1st, 2nd and 3rd of twenty-one and looked
+convincing. Tested against the three non-July evenings it scored 0, 9 and 4: ranks 20th,
+5th and 11th, an average of 12th against a random expectation of 11th. On 20 February,
+six evenings in the surrounding window swung 70 points or more and the one photographed
+swung zero. It described July and nothing else. It is retained as one feature among
+nineteen, not as the answer.
+
+**The trap.** In a frame exposed for the horizon band, a uniformly lit cloud deck and a
+clear sky are not visually distinguishable — both render as a smooth gradient. Cloud read
+off a photograph is reliable only when it has visible texture. Check any photographic
+cloud read against the archive before writing it down.
+
+---
+
+## The photographs have no EXIF
+
+Not stripped of location — stripped of everything. No `DateTimeOriginal`, no camera
+model, no GPS. A stated time cannot be checked against metadata, so it is checked against
+the sun instead. Angular diameter is a fixed 0.5333°, so measuring the disk and its
+height above the horizon in pixels gives apparent elevation regardless of focal length:
 
 ```
 apparent_elevation_deg = (horizon_y − sun_centre_y) / disk_diameter_px × 0.5333
 ```
 
-Feed that through `solar.py` and you get the time the frame implies. If that disagrees
-with what you typed by more than six minutes, `add_evening.py` stops and makes you
-decide rather than quietly picking one. This check previously caught a stated time that
-was 43 minutes wrong.
-
-Two details that are easy to get wrong, both learned the hard way:
+Two details had to be right, both found by looking at the pixels rather than reasoning
+about them:
 
 - **The horizon is found by texture, not brightness.** On a hazy evening the sea horizon
-  is a soft ramp spread over ~20 rows while the surf line lower down is a genuinely sharp
-  step, so "sharpest bright-to-dark step" reliably finds the beach instead. Across
-  columns, sky varies by about 2–3 grey levels, open water by 5–30. The horizon is where
-  that variance first rises.
-- **The disk is measured at its widest row, not its centroid.** Cloud often clips the top
-  of the disk, which drags a centroid downward; and refraction flattens the disk
-  vertically near the horizon, so its height understates the diameter while its width
-  does not.
+  is a soft ramp over ~20 rows while the surf line below is a genuinely sharp step, so
+  "sharpest bright-to-dark step" reliably finds the beach. Across columns, sky varies by
+  2–3 grey levels and open water by 5–30.
+- **The disk is measured at its widest row, not its centroid.** Cloud often clips the top,
+  which drags a centroid down, and refraction flattens the disk vertically so its height
+  understates the diameter.
 
-Afterglow frames have no disk. `add_evening.py` will say so and ask you for `--time`.
-
----
-
-## Finding out what actually makes a sunset compelling
-
-```powershell
-python analyse.py
-```
-
-Each photographed evening is compared **only against the evenings within ±10 days of
-it**, which controls for season. Every variable gets a percentile rank inside that local
-window; under the null hypothesis that a variable has nothing to do with whether you
-took a photograph, those percentiles are uniform, so the deviation is testable rather
-than a matter of opinion.
-
-It prints a Bonferroni-corrected threshold and tells you plainly whether anything clears
-it. As of six evenings, **nothing does** — the strongest candidate would need roughly 18
-evenings to become evidence. It also warns when evenings sit close enough together to
-share a comparison window, because their percentiles are then correlated and the
-threshold is flattered.
-
-This is the point of the project. It is easy to find a statistic that fits six
-photographs; the log exists to find one that survives the seventh.
-
----
-
-## What is established, and what isn't
-
-**Holds up.** Every evening on record had a clear slot at the western horizon — six
-evenings, three seasons, no exceptions. It is the only claim that has never needed
-revising.
-
-**Falsified.** The low-cloud "swing" statistic ranked the three July evenings 1st, 2nd
-and 3rd of twenty-one and looked compelling. Tested out of sample on the three non-July
-evenings it scores 0, 9 and 4 — ranks 20th, 5th and 11th, an average of 12th against a
-random expectation of 11th. February 20 is the clearest refutation: six evenings in its
-window swung 70 points or more and the one that was photographed swung zero. The
-statistic describes July and does not generalise.
-
-**Open.** Offshore sampling 25–150 km along the sunset bearing is mixed. For the July 27
-/ July 17 pair it works decisively — the station cannot tell them apart at 99% and 100%
-low cloud, while offshore they separate 24 against 99. For the July 21 / July 13 pair it
-fails: July 13 was never photographed yet had the second-clearest offshore sky of the
-month. Offshore values are computed but deliberately not yet written into the dataset.
-
-**The trap to keep in mind.** In a frame exposed for the horizon band, a uniformly lit
-cloud deck and clear sky are not visually distinguishable — both render as a smooth
-gradient. Cloud read from a photograph is reliable when the cloud has visible *texture*
-and unreliable otherwise. Two early reads were wrong in opposite directions for exactly
-this reason. Check a photographic cloud read against the retrieved data before writing
-it into `read`, and record the correction in `revision` rather than quietly presenting
-the corrected version.
+Validated at +0.49° and +0.52° against a known +0.53°. Where a disk is measurable the
+measurement beats a remembered time, and a disagreement over six minutes stops the run.
+Afterglow frames have no disk; supply `--time` for those.
 
 ---
 
@@ -137,15 +177,17 @@ the corrected version.
 
 | | |
 |---|---|
-| `index.html` | the entire site — HTML, CSS, JS. Fetches `data/evenings.json`. |
-| `data/evenings.json` | the dataset. The file you edit routinely. |
-| `photos/` | JPEGs at 1600 px long edge. |
-| `add_evening.py` | the one command that ingests a new evening. |
-| `measure_time.py` | measures the sun in a frame; `--validate` must pass first. |
-| `solar.py` | NOAA solar position — sunset, elevation, azimuth. `--validate`. |
-| `weather.py` | Open-Meteo pulls and the trace/swing definitions. |
+| `store.py` | the archive: schema, points, labels. `python store.py` prints its state. |
+| `ingest.py` | fetch and store. Backfill, update, forecast. |
+| `features.py` | raw hourly → one feature vector per evening. |
+| `trends.py` | what your favorites have in common, honestly tested. |
+| `forecast.py` | whether the next few evenings look worth it. |
+| `add_favorite.py` | record an evening you liked. |
+| `publish.py` | regenerate the website's data file from the archive. |
+| `measure_time.py` | measure the sun in a frame. `--validate` first. |
+| `solar.py` | NOAA solar position. `--validate` first. |
 | `resize.py` | photographs into `photos/` at web size. |
-| `analyse.py` | what separates photographed evenings from the rest. |
+| `index.html` | the public page. Reads `data/evenings.json`. |
 
 Both validators should pass before you trust a new measurement:
 
@@ -154,33 +196,30 @@ python solar.py --validate
 python measure_time.py --validate
 ```
 
-`solar.py` and `weather.py` use the standard library only. `resize.py`, `measure_time.py`
-and `add_evening.py` need:
-
-```powershell
-pip install pillow numpy
-pip install pillow-heif   # only if you drop HEIC files straight off an iPhone
-```
-
-The site itself has no dependencies, no framework and no build step.
+Requirements: `pip install pillow numpy`. `store.py`, `ingest.py`, `features.py`,
+`trends.py`, `forecast.py` and `solar.py` are standard library only. The website has no
+dependencies and no build step.
 
 ---
 
 ## Gotchas
 
-- The branch is **`master`**, not `main`.
+- The git branch is **`master`**, not `main`.
+- **Pushing to GitHub does not deploy.** There is no git integration on this Vercel
+  project. Deploy with `vercel deploy --prod --cwd <this folder>` *and* push, every time,
+  or the live site and the repo drift apart.
+- **`data/sunsets.db` is gitignored.** Weather is re-fetchable, and a binary file that
+  grows ~12 MB a year would bloat the repository on every commit. What is *not*
+  re-fetchable is which evenings you liked, so labels are mirrored to
+  `data/favorites.json`, which **is** committed. Losing the db costs a re-fetch; losing
+  the labels costs the project.
 - **Open-Meteo stamps a whole response with one UTC offset** taken from the request's
-  current season, so a February window comes back labelled PDT and every sunset reads an
-  hour late. The hourly timestamps shift by the same amount, so matching an hour against
-  the API's own labels still picks the correct physical hour — but any label shown to a
-  human is wrong. `weather.py` corrects this and warns when it fires.
-- **The swing window and the trace window differ on purpose.** The trace is seven values,
-  sunset−3h to +3h. The swing is the range over six values, sunset−2h to +3h. Don't unify
-  them; the existing numbers use exactly this definition.
+  current season, so a February window comes back labelled PDT with every timestamp an
+  hour late. Hourly fields shift together so the data is internally consistent, but
+  storing those labels would corrupt the archive the moment it was queried across a DST
+  boundary. `ingest.py` normalises to true local time on the way in.
 - **Sunset within a minute of the half hour** flips which hour it rounds to, which is
-  enough to change a swing. Two July evenings differ from their originally recorded
-  values for precisely this reason.
+  enough to change a swing value.
 - Validate the JSON before deploying. A broken file yields a silently blank page rather
   than a visible error.
-- `.vercel` is gitignored, so link folders are invisible to `git status`.
 - Open-Meteo needs no API key. Data is CC BY 4.0, attributed in the site footer.

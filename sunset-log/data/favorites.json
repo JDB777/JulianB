@@ -1,0 +1,68 @@
+{
+  "watch_start": "2026-02-20",
+  "watch_end": "2026-07-27",
+  "labels": [
+    {
+      "date": "2026-02-20",
+      "status": "favorite",
+      "photos": [
+        "IMG_1851.jpg"
+      ],
+      "shot_time": "18:18",
+      "note": "year not stated, assumed 2026",
+      "added_at": "2026-07-27T23:42:01"
+    },
+    {
+      "date": "2026-03-18",
+      "status": "favorite",
+      "photos": [
+        "IMG_3255.jpg"
+      ],
+      "shot_time": "19:09",
+      "note": "time corrected from 18:26 by measurement",
+      "added_at": "2026-07-27T23:42:01"
+    },
+    {
+      "date": "2026-03-27",
+      "status": "favorite",
+      "photos": [
+        "IMG_3477.jpg"
+      ],
+      "shot_time": "19:32",
+      "note": "confirmed",
+      "added_at": "2026-07-27T23:42:01"
+    },
+    {
+      "date": "2026-07-12",
+      "status": "favorite",
+      "photos": [
+        "IMG_4510.jpg"
+      ],
+      "shot_time": "20:32",
+      "note": "confirmed",
+      "added_at": "2026-07-27T23:42:01"
+    },
+    {
+      "date": "2026-07-21",
+      "status": "favorite",
+      "photos": [
+        "IMG_4703.jpg",
+        "IMG_4717.jpg"
+      ],
+      "shot_time": "20:27",
+      "note": "confirmed",
+      "added_at": "2026-07-27T23:42:01"
+    },
+    {
+      "date": "2026-07-27",
+      "status": "favorite",
+      "photos": [
+        "IMG_4769.jpg",
+        "IMG_4770.jpg"
+      ],
+      "shot_time": "20:19",
+      "note": "confirmed",
+      "added_at": "2026-07-27T23:42:01"
+    }
+  ]
+}

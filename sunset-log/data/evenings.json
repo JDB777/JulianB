@@ -4,11 +4,11 @@
     "lat": 37.7594,
     "lon": -122.5107,
     "grid_point": "37.775 N, 122.488 W",
-    "weather_source": "Open-Meteo. July 2026 from the forecast endpoint; February and March 2026 from the Historical Forecast API, which reproduced the July values exactly."
+    "weather_source": "Open-Meteo, archived locally. Station plus a fan of offshore points sampled along each evening's sunset bearing."
   },
   "notes_on_method": {
     "swing": "Range of low cloud cover across the window from 2 h before sunset to 3 h after. Measures the marine layer edge transiting the station. Across 20 July evenings, the three photographed evenings ranked 1st, 2nd and 3rd on this statistic.",
-    "caution": "Swing was identified after noticing the pattern in three July evenings, and has now been tested out of sample on the three non-July evenings. It failed. Their swings were 0, 9 and 4, ranking 20th, 5th and 11th of the 21 evenings in their surrounding windows — an average rank of 12th, which is what picking at random would give. The statistic describes July and does not generalise beyond it.",
+    "caution": "Swing was identified after noticing the pattern in three July evenings and then tested out of sample on the three non-July ones. It failed: swings of 0, 9 and 4, ranking 20th, 5th and 11th among the evenings around them, an average rank of 12th against a random expectation of 11th. It is now one candidate among twenty-two rather than the answer. Against 573 archived evenings, the best-calibrated single indicator so far is visibility at the sunset hour, which places four of the six on record in the top 15 per cent for their time of year - but with six evenings nothing survives correction for having asked the question of twenty-two variables at once, and it is reported as a lead rather than a finding.",
     "visual_reads": "Cloud identified from photographs is reliable when the cloud has visible texture. In frames exposed for the horizon band, a uniformly lit deck and clear sky are not distinguishable, and two early reads were wrong in opposite directions."
   },
   "evenings": [
@@ -20,7 +20,7 @@
       "shot_time": "18:18",
       "sunset": "17:54",
       "offset_min": 24,
-      "sun_elev_apparent": -4.12,
+      "sun_elev_apparent": -5.29,
       "sunset_azimuth": 257.1,
       "offshore_50km": [
         37.659,
@@ -50,6 +50,11 @@
         "swing": 0,
         "swing_rank": 20
       },
+      "offshore": {
+        "slot_50": 100,
+        "slot_100": 98,
+        "bearing": 257.1
+      },
       "type": "afterglow",
       "read": "Deep uniform amber across the whole sky with no disk, a dark low stratocumulus band silhouetted on the horizon and glow both above and below it. Almost no cloud aloft, so the colour is path length through clean air rather than anything catching light.",
       "revision": "Corrected by the data. Mid-level cloud was 71 per cent, not the nearly empty sky the frame suggested, so the uniform amber was lit cloud rather than path length through clean air alone. Low cloud at the station was 0 per cent and visibility 27.4 km, so the open horizon slot in the read does hold. This is the texture problem again: an evenly lit deck seen 24 minutes after sunset carries no visible structure to read, and was mistaken for an empty sky.",
@@ -61,10 +66,10 @@
         "IMG_3255.jpg"
       ],
       "shot_time": "19:09",
-      "sunset": "19:20",
+      "sunset": "19:19",
       "offset_min": -11,
-      "sun_elev_apparent": 1.7,
-      "sunset_azimuth": 269.9,
+      "sun_elev_apparent": 1.72,
+      "sunset_azimuth": 269.8,
       "offshore_50km": [
         37.758,
         -123.079
@@ -93,6 +98,11 @@
         "swing": 9,
         "swing_rank": 5
       },
+      "offshore": {
+        "slot_50": 0,
+        "slot_100": 0,
+        "bearing": 269.8
+      },
       "type": "clean disk",
       "read": "Small, crisp, nearly white disk with container ships legible on the horizon. Thin cirrostratus streaks and two small dark altocumulus patches. Very low tide with wide wet sand and a long reflection.",
       "revision": "Corrected by the data. This was not the cleanest air in the collection but the haziest and dampest of the six evenings — visibility 18.1 km at 79 per cent humidity, against 27.4 km at 66 per cent on 20 February and 27.0 km at 64 per cent on 27 March. A white disk therefore does not indicate low aerosol here, and that inference should not be reused. The model also reports 0 per cent mid and high cloud against the cirrostratus streaks and altocumulus patches visible in the frame, which are small enough to fall below the resolution of a coarse grid cell.",
@@ -106,7 +116,7 @@
       "shot_time": "19:32",
       "sunset": "19:28",
       "offset_min": 4,
-      "sun_elev_apparent": -0.27,
+      "sun_elev_apparent": -1.29,
       "sunset_azimuth": 274.3,
       "offshore_50km": [
         37.793,
@@ -136,6 +146,11 @@
         "swing": 4,
         "swing_rank": 11
       },
+      "offshore": {
+        "slot_50": 94,
+        "slot_100": 90,
+        "bearing": 274.3
+      },
       "type": "full canvas",
       "read": "The most developed sky in the collection. Extensive mid-level altocumulus in strong horizontal wave banding, at least three distinguishable layers, lit vivid orange-red from beneath, with a bright slot at the horizon where the sun had just gone. The wave structure implies wind shear across the layers.",
       "revision": "Partly contradicted by the data. The station cell reports only 17 per cent mid cloud and 6 per cent high against the extensive banded altocumulus filling the photograph. The read here is of strongly textured cloud, which is the case where reading cloud from a photograph is reliable, so the likelier explanation is that the cloud sat west of the station over open water — the frame looks out to sea while the grid cell sits inland of the beach. Offshore sampling for March has not been pulled and would settle it.",
@@ -149,7 +164,7 @@
       "shot_time": "20:32",
       "sunset": "20:33",
       "offset_min": -1,
-      "sun_elev_apparent": 0.56,
+      "sun_elev_apparent": -0.19,
       "sunset_azimuth": 298.8,
       "offshore_50km": [
         37.976,
@@ -162,7 +177,7 @@
         "cc_high": 99,
         "visibility_km": 20.1,
         "rh": 75,
-        "dew_c": 12.5,
+        "dew_c": 11.3,
         "mslp": 1012.8,
         "rh_pre_min": 75,
         "vis_pre_max_km": 19.2,
@@ -179,7 +194,11 @@
         "swing": 96,
         "swing_rank": 2
       },
-      "offshore": null,
+      "offshore": {
+        "slot_50": 35,
+        "slot_100": 88,
+        "bearing": 298.8
+      },
       "type": "full canvas",
       "read": "Extensive altocumulus in a mackerel-scale undulating pattern with finer cirrus above, all lit gold from underneath, blue showing through the gaps, clear pale slot at the horizon. Shot from further north looking past Seal Rocks toward Point Reyes.",
       "revision": "Confirmed by the data: mid cloud 99 percent, high cloud 99 percent, low cloud 4 percent. When cloud has visible texture the photographic read holds up exactly.",
@@ -194,11 +213,11 @@
       "shot_time": "20:27",
       "sunset": "20:28",
       "offset_min": -1,
-      "sun_elev_apparent": 0.54,
-      "sunset_azimuth": 296.6,
+      "sun_elev_apparent": -0.23,
+      "sunset_azimuth": 296.8,
       "offshore_50km": [
         37.962,
-        -123.019
+        -123.018
       ],
       "timestamp_confidence": "confirmed",
       "weather": {
@@ -224,7 +243,11 @@
         "swing": 99,
         "swing_rank": 1
       },
-      "offshore": null,
+      "offshore": {
+        "slot_50": 40,
+        "slot_100": 1,
+        "bearing": 296.8
+      },
       "type": "clear, underexposed",
       "read": "Originally read as a thick featureless overcast across the whole dome with an intense red-orange band compressed into the bottom few degrees and the disk on the waterline.",
       "revision": "Wrong. The data shows zero cloud at all three levels, the month's best visibility and its second-lowest humidity — three independent variables agreeing on genuinely clear, dry air. What looked like a deck was underexposed clear twilight sky, the phone having metered for the bright horizon band. The accompanying aerosol read was wrong for the same reason: this was the cleanest air of the month, not the haziest.",
@@ -238,11 +261,11 @@
       ],
       "shot_time": "20:19",
       "sunset": "20:23",
-      "offset_min": -4,
-      "sun_elev_apparent": 0.53,
-      "sunset_azimuth": 295.0,
+      "offset_min": -5,
+      "sun_elev_apparent": 0.39,
+      "sunset_azimuth": 295.1,
       "offshore_50km": [
-        37.949,
+        37.95,
         -123.026
       ],
       "timestamp_confidence": "confirmed",
@@ -262,14 +285,18 @@
           80,
           54,
           99,
-          11,
-          13,
-          20
+          21,
+          14,
+          11
         ],
         "swing": 88,
-        "swing_rank": 3
+        "swing_rank": 2
       },
-      "offshore": null,
+      "offshore": {
+        "slot_50": 82,
+        "slot_100": 88,
+        "bearing": 295.1
+      },
       "type": "deck overhead, underlit",
       "read": "Originally read as essentially cloudless above with a single sharply defined band sitting well offshore. Large, deep orange, refraction-flattened disk about one diameter above the water.",
       "revision": "Partly wrong. Low cloud was 99 percent at the sunset hour. The smooth orange gradient filling the frame was the lit underside of the marine layer, and the band near the horizon was its seaward edge seen nearly edge-on — a deck at 400 m converges toward the horizon as it recedes, which is what an edge 50 km out looks like.",

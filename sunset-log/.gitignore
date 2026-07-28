@@ -1,4 +1,11 @@
 .vercel
 __pycache__/
 *.pyc
+
+# The weather archive is large, binary, and always re-fetchable with
+# `python ingest.py backfill`. What is NOT re-fetchable is which evenings
+# were keepers, so data/favorites.json is committed instead.
+data/sunsets.db
+data/sunsets.db-journal
+data/sunsets.db-wal
 data/window_cache.json
