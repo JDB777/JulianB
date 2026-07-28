@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunset log — Ocean Beach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDEEEA; --card:#F7F8F5; --ink:#14202B; --soft:#4A5A66;
+    --faint:#8A959C; --rule:#C9CDC7; --tide:#1F6F7A; --tide-bg:#E2ECEC;
+    --cond:'Archivo Narrow',system-ui,sans-serif;
+    --serif:'Source Serif 4',Georgia,serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--serif); font-size:16px; line-height:1.6;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+  /* ---------- front matter ---------- */
+  .masthead{padding:72px 0 0}
+  .eyebrow{
+    font-family:var(--cond); font-size:12px; font-weight:600;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--tide); margin:0 0 14px;
+  }
+  .masthead h1{
+    font-family:var(--cond); font-weight:600; font-size:clamp(38px,6.5vw,64px);
+    line-height:.98; letter-spacing:-.015em; margin:0 0 22px; max-width:15ch;
+  }
+  .thesis{
+    font-family:var(--serif); font-size:19px; line-height:1.55;
+    max-width:62ch; margin:0 0 34px; color:var(--soft);
+  }
+  .thesis em{color:var(--ink); font-style:italic}
+  .station{
+    display:flex; flex-wrap:wrap; gap:0; border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule); margin-bottom:64px;
+  }
+  .station div{
+    flex:1 1 150px; padding:14px 20px 15px; border-left:1px solid var(--rule);
+  }
+  .station div:first-child{border-left:0; padding-left:0}
+  .station dt{
+    font-family:var(--cond); font-size:11px; font-weight:600; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--faint); margin:0 0 4px;
+  }
+  .station dd{font-family:var(--mono); font-size:14px; margin:0; color:var(--ink)}
+
+  /* ---------- entry ---------- */
+  .entry{border-top:2px solid var(--ink); padding-top:0; margin-bottom:76px}
+  .entry-head{
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:0 22px;
+    padding:12px 0 18px;
+  }
+  .entry-date{
+    font-family:var(--cond); font-weight:600; font-size:27px; letter-spacing:-.005em;
+  }
+  .entry-off{font-family:var(--mono); font-size:14px; color:var(--tide)}
+  .entry-type{
+    font-family:var(--cond); font-size:12px; font-weight:500; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--faint); margin-left:auto;
+  }
+  .cols{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:30px}
+  .frames{display:flex; flex-direction:column; gap:12px; min-width:0}
+  .frames img{
+    width:100%; height:auto; display:block; border-radius:2px;
+    background:var(--rule);
+  }
+  .frames figcaption{
+    font-family:var(--mono); font-size:11px; color:var(--faint); margin-top:5px;
+  }
+  .frames figure{margin:0}
+  .panel{min-width:0}
+  .plabel{
+    font-family:var(--cond); font-size:11px; font-weight:600; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--faint);
+    padding-bottom:7px; border-bottom:1px solid var(--rule); margin:0 0 13px;
+  }
+  .plabel + .plabel{margin-top:26px}
+  svg.read{display:block; width:100%; height:auto; margin-bottom:22px}
+  svg.read text{font-family:var(--mono)}
+  svg.read .hz{stroke:var(--ink); stroke-width:1}
+  svg.read .cap,svg.read .grid{stroke:var(--rule); stroke-width:1}
+  svg.read .now{stroke:var(--soft); stroke-width:1}
+  svg.read .sun{stroke:var(--tide); stroke-width:1.5; fill:var(--tide)}
+  svg.read .sun.below{fill:none; opacity:.65}
+  svg.read .line{stroke:var(--tide); stroke-width:2; fill:none}
+  svg.read .dot{fill:var(--tide)}
+  svg.read .t-soft{fill:var(--soft)}
+  svg.read .t-faint{fill:var(--faint)}
+
+  .meas{width:100%; border-collapse:collapse; margin-bottom:4px}
+  .meas th{
+    text-align:left; font-family:var(--cond); font-weight:400; font-size:13px;
+    color:var(--soft); padding:4px 0; border-bottom:1px solid #E1E4DF;
+  }
+  .meas td{
+    text-align:right; font-family:var(--mono); font-size:13px; padding:4px 0;
+    border-bottom:1px solid #E1E4DF; white-space:nowrap;
+  }
+  .meas tr:last-child th, .meas tr:last-child td{border-bottom:0}
+  .rank{color:var(--tide)}
+
+  .flags{list-style:none; margin:0; padding:0}
+  .flags li{
+    display:flex; gap:10px; align-items:flex-start; padding:7px 0;
+    border-bottom:1px solid #E1E4DF; font-family:var(--cond); font-size:14px;
+  }
+  .flags li:last-child{border-bottom:0}
+  .flags .tick{
+    flex:0 0 auto; width:6px; height:6px; margin-top:7px; border-radius:50%;
+    background:var(--tide);
+  }
+  .flags .gap .tick, .flags li.gap .tick{background:var(--faint)}
+  .flags li.gap{color:var(--faint)}
+  .flags b{font-weight:500}
+  .flags span.v{font-family:var(--mono); font-size:12px; color:var(--soft); display:block}
+
+  /* ---------- prose ---------- */
+  .prose{margin-top:30px; padding-top:24px; border-top:1px solid var(--rule);
+         display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:26px 34px}
+  .prose section{min-width:0}
+  .prose h3{
+    font-family:var(--cond); font-size:11px; font-weight:600; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--faint); margin:0 0 7px;
+  }
+  .prose p{margin:0; font-size:15.5px; line-height:1.62; color:var(--soft)}
+  .prose section.rev h3{color:var(--tide)}
+  .prose section.rev p{
+    color:var(--ink); border-left:2px solid var(--tide); padding-left:14px;
+  }
+
+  footer{
+    border-top:1px solid var(--rule); margin-top:20px; padding:28px 0 80px;
+    font-family:var(--mono); font-size:12px; color:var(--faint); line-height:1.8;
+  }
+  footer p{margin:0 0 8px; max-width:80ch}
+
+  a{color:var(--tide)}
+  a:focus-visible, img:focus-visible{outline:2px solid var(--tide); outline-offset:3px}
+
+  @media (max-width:760px){
+    .cols{grid-template-columns:1fr; gap:24px}
+    .entry-type{margin-left:0; flex-basis:100%; margin-top:4px}
+    .station div{border-left:0; padding-left:0}
+    .masthead{padding-top:44px}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .entry{opacity:0; transform:translateY(14px); animation:rise .55s ease forwards}
+    @keyframes rise{to{opacity:1; transform:none}}
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#12171A; --card:#1A2024; --ink:#EDEEEA; --soft:#A8B2B6;
+      --faint:#6E797E; --rule:#2C3438; --tide:#5FB6B4; --tide-bg:#1B2A2B;
+    }
+    .meas th,.meas td,.flags li{border-bottom-color:#252D31}
+    .frames img{background:#252D31}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Observation log</p>
+    <h1>What made the sky do that</h1>
+    <p class="thesis">
+      A running record of the sunsets worth photographing from one stretch of beach, set
+      against what the atmosphere was measurably doing at the time. Six evenings so far.
+      Every one of them had <em>a clear slot at the western horizon</em>; on the three with
+      weather data retrieved, the marine layer's edge was crossing the beach within an hour
+      or two of sunset.
+    </p>
+    <dl class="station" id="station"></dl>
+  </header>
+
+  <main id="log"></main>
+
+  <footer>
+    <p id="method"></p>
+    <p id="caution"></p>
+    <p>Solar elevation and azimuth computed with the NOAA solar position algorithm. Weather from Open-Meteo, CC BY 4.0.</p>
+  </footer>
+
+</div>
+
+<script>
+const F1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* ---- the reading: horizon line with the sun where it actually was ---- */
+function sunSvg(e){
+  const W = 320, H = 92, hz = 62, top = 14;
+  const lo = -6, hi = 3;                       // degrees mapped to the strip
+  const y = d => hz - (d - 0) * ((hz - top) / hi);
+  const el = Math.max(lo, Math.min(hi, e.sun_elev_apparent));
+  const cy = Math.max(top - 2, Math.min(H - 8, y(el)));
+  const below = e.sun_elev_apparent < 0;
+  return `<svg class="read" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Sun at ${F1(e.sun_elev_apparent)} degrees apparent elevation, bearing ${e.sunset_azimuth.toFixed(0)} degrees">
+    <line class="hz" x1="0" y1="${hz}" x2="${W}" y2="${hz}"/>
+    <line class="cap" x1="0" y1="${y(hi)}" x2="${W}" y2="${y(hi)}" stroke-dasharray="2 4"/>
+    <circle class="sun${below ? ' below' : ''}" cx="86" cy="${cy}" r="9"/>
+    <text class="t-soft" x="106" y="${cy + 4}" font-size="11">
+      ${F1(e.sun_elev_apparent)}&#176; ${below ? 'below' : 'above'} horizon</text>
+    <text class="t-faint" x="0" y="${hz + 17}" font-size="11">
+      bearing ${e.sunset_azimuth.toFixed(0)}&#176; &#183; ${e.offset_min > 0 ? '+' : ''}${e.offset_min} min from sunset</text>
+  </svg>`;
+}
+
+/* ---- low cloud through the sunset window: the motion, not the state ---- */
+function traceSvg(w){
+  const W = 320, H = 96, L = 30, R = 8, T = 10, B = 26;
+  const pts = w.low_trace, n = pts.length;
+  const x = i => L + i * (W - L - R) / (n - 1);
+  const y = v => T + (100 - v) * (H - T - B) / 100;
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const dots = pts.map((v, i) =>
+    `<circle class="dot" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${i === 3 ? 3.5 : 2.2}"/>`).join('');
+  return `<svg class="read" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Low cloud cover from three hours before to three hours after sunset: ${pts.join(', ')} percent">
+    ${[0, 50, 100].map(v => `<line class="grid" x1="${L}" y1="${y(v)}" x2="${W - R}" y2="${y(v)}"/>
+      <text class="t-faint" x="0" y="${y(v) + 4}" font-size="10">${v}%</text>`).join('')}
+    <line class="now" x1="${x(3)}" y1="${T}" x2="${x(3)}" y2="${H - B}" stroke-dasharray="2 3"/>
+    <path class="line" d="${d}" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text class="t-faint" x="${L}" y="${H - 8}" font-size="10">&#8722;3h</text>
+    <text class="t-faint" x="${x(3)}" y="${H - 8}" font-size="10" text-anchor="middle">sunset</text>
+    <text class="t-faint" x="${W - R}" y="${H - 8}" font-size="10" text-anchor="end">+3h</text>
+  </svg>`;
+}
+
+/* ---- derive what was noteworthy, from the numbers ---- */
+function flags(e){
+  const out = [], w = e.weather;
+  const add = (t, v, gap) => out.push({t, v, gap: !!gap});
+
+  if (Math.abs(e.offset_min) <= 5)
+    add('Shot at the sun', `${e.offset_min >= 0 ? '+' : ''}${e.offset_min} min from sunset, disk on the horizon`);
+  else if (e.offset_min >= 15)
+    add('Afterglow', `sun ${Math.abs(e.sun_elev_apparent).toFixed(1)}\u00B0 below the horizon`);
+  else
+    add('Approaching sunset', `${e.offset_min} min out, sun ${F1(e.sun_elev_apparent)}\u00B0 up`);
+
+  if (w){
+    if (w.swing >= 70)
+      add('Marine layer edge transited near sunset',
+          `low cloud swung ${w.swing} points across the window` +
+          (w.swing_rank ? ` \u2014 rank ${w.swing_rank} of 20 July evenings` : ''));
+    if (w.rh_pre_min < 50)
+      add('Dry offshore air mass', `humidity fell to ${w.rh_pre_min}%, dew point ${F1(w.dew_pre_min_c)}\u00B0C \u2014 marine layer scoured out`);
+    if (w.vis_pre_max_km > 30)
+      add('Exceptional clarity', `visibility reached ${w.vis_pre_max_km} km`);
+    if (w.cc_mid >= 60 && w.cc_high >= 60)
+      add('Full canvas overhead', `mid ${w.cc_mid}%, high ${w.cc_high}% \u2014 cloud available to underlight`);
+    if (w.cc_low >= 80)
+      add('Deck directly overhead', `low cloud ${w.cc_low}%, lit from beneath`);
+    if (w.cc_low <= 20 && w.cc_mid <= 20 && w.cc_high <= 20)
+      add('Open sky', 'no cloud at any level \u2014 colour from path length alone');
+    if (!e.offshore)
+      add('No offshore sampling', 'station data cannot confirm whether the horizon slot was open', true);
+  } else {
+    add('Weather not yet retrieved', 'needs the archive endpoint \u2014 beyond the 92-day window', true);
+  }
+  return out;
+}
+
+function measures(w){
+  if (!w) return '';
+  const rows = [
+    ['Low cloud', `${w.cc_low}%`],
+    ['Mid cloud', `${w.cc_mid}%`],
+    ['High cloud', `${w.cc_high}%`],
+    ['Visibility', `${w.visibility_km} km`],
+    ['Humidity', `${w.rh}%`],
+    ['Dew point', `${F1(w.dew_c)} \u00B0C`],
+    ['Pressure', `${w.mslp} hPa`],
+    ['Low-cloud swing', `${w.swing}<span class="rank"> \u00B7 #${w.swing_rank}</span>`]
+  ];
+  return `<table class="meas"><tbody>${rows.map(
+    ([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function entry(e, i){
+  const w = e.weather;
+  return `<article class="entry" style="animation-delay:${Math.min(i * 70, 350)}ms">
+    <div class="entry-head">
+      <h2 class="entry-date">${esc(e.date)}</h2>
+      <span class="entry-off">${esc(e.shot_time)} \u00B7 sunset ${esc(e.sunset)}</span>
+      <span class="entry-type">${esc(e.type)}</span>
+    </div>
+    <div class="cols">
+      <div class="frames">
+        ${e.photos.map(p => `<figure>
+          <img src="photos/${encodeURIComponent(p)}" alt="Sunset at Ocean Beach on ${esc(e.date)}" loading="lazy">
+          <figcaption>${esc(p)}</figcaption></figure>`).join('')}
+      </div>
+      <div class="panel">
+        <p class="plabel">Reading</p>
+        ${sunSvg(e)}
+        ${w ? traceSvg(w) : ''}
+        ${w ? '<p class="plabel">At the sunset hour</p>' + measures(w) : ''}
+        <p class="plabel">Noteworthy</p>
+        <ul class="flags">${flags(e).map(f =>
+          `<li class="${f.gap ? 'gap' : ''}"><span class="tick"></span>
+            <span><b>${esc(f.t)}</b><span class="v">${f.v}</span></span></li>`).join('')}
+        </ul>
+      </div>
+    </div>
+    <div class="prose">
+      <section><h3>What the photograph shows</h3><p>${esc(e.read)}</p></section>
+      ${e.revision ? `<section class="rev"><h3>Corrected by the data</h3><p>${esc(e.revision)}</p></section>` : ''}
+      <section><h3>The day around it</h3><p>${esc(e.note)}</p></section>
+    </div>
+  </article>`;
+}
+
+fetch('data/evenings.json')
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(d => {
+    const s = d.station;
+    const withW = d.evenings.filter(e => e.weather).length;
+    document.getElementById('station').innerHTML = [
+      ['Station', s.name],
+      ['Position', `${s.lat.toFixed(4)} N, ${Math.abs(s.lon).toFixed(4)} W`],
+      ['Evenings on record', String(d.evenings.length)],
+      ['Weather retrieved', `${withW} of ${d.evenings.length}`]
+    ].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
+
+    const order = [...d.evenings].sort((a, b) => b.date.localeCompare(a.date));
+    document.getElementById('log').innerHTML = order.map(entry).join('');
+    document.getElementById('method').textContent = 'Low-cloud swing \u2014 ' + d.notes_on_method.swing;
+    document.getElementById('caution').textContent = d.notes_on_method.caution + ' ' + d.notes_on_method.visual_reads;
+  })
+  .catch(err => {
+    document.getElementById('log').innerHTML =
+      `<article class="entry"><div class="entry-head"><h2 class="entry-date">No data loaded</h2></div>
+       <p class="thesis">Could not read <code>data/evenings.json</code> (${esc(err.message)}).
+       Opening this file directly from disk will not work \u2014 browsers block the fetch.
+       Run <code>npx serve</code> in the project folder and open the address it prints.</p></article>`;
+  });
+</script>
+</body>
+</html>

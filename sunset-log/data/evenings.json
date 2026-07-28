@@ -1,0 +1,133 @@
+{
+  "station": {
+    "name": "Ocean Beach, San Francisco",
+    "lat": 37.7594,
+    "lon": -122.5107,
+    "grid_point": "37.775 N, 122.488 W",
+    "weather_source": "Open-Meteo (ERA5 reanalysis / forecast archive)"
+  },
+  "notes_on_method": {
+    "swing": "Range of low cloud cover across the window from 2 h before sunset to 3 h after. Measures the marine layer edge transiting the station. Across 20 July evenings, the three photographed evenings ranked 1st, 2nd and 3rd on this statistic.",
+    "caution": "Swing was identified after noticing the pattern in three evenings, so it is a post-hoc statistic awaiting out-of-sample confirmation.",
+    "visual_reads": "Cloud identified from photographs is reliable when the cloud has visible texture. In frames exposed for the horizon band, a uniformly lit deck and clear sky are not distinguishable, and two early reads were wrong in opposite directions."
+  },
+  "evenings": [
+    {
+      "date": "2026-02-20",
+      "photos": ["IMG_1851.jpg"],
+      "shot_time": "18:18",
+      "sunset": "17:54",
+      "offset_min": 24,
+      "sun_elev_apparent": -4.12,
+      "sunset_azimuth": 257.1,
+      "offshore_50km": [37.659, -123.064],
+      "timestamp_confidence": "year not stated, assumed 2026",
+      "weather": null,
+      "type": "afterglow",
+      "read": "Deep uniform amber across the whole sky with no disk, a dark low stratocumulus band silhouetted on the horizon and glow both above and below it. Almost no cloud aloft, so the colour is path length through clean air rather than anything catching light.",
+      "revision": null,
+      "note": "The only afterglow frame in the collection. Its existence overturned an earlier conclusion that these photographs were always taken at the sun rather than after it — that pattern was an artefact of a July-only sample. No magenta, which is what you expect without high cirrus."
+    },
+    {
+      "date": "2026-03-18",
+      "photos": ["IMG_3255.jpg"],
+      "shot_time": "19:09",
+      "sunset": "19:20",
+      "offset_min": -11,
+      "sun_elev_apparent": 1.7,
+      "sunset_azimuth": 269.9,
+      "offshore_50km": [37.758, -123.079],
+      "timestamp_confidence": "time corrected from 18:26 by measurement",
+      "weather": null,
+      "type": "clean disk",
+      "read": "Small, crisp, nearly white disk with container ships legible on the horizon. Thin cirrostratus streaks and two small dark altocumulus patches. Very low tide with wide wet sand and a long reflection.",
+      "revision": null,
+      "note": "The cleanest air in the collection — a white rather than reddened disk at low elevation means minimal aerosol and moisture. Stated time was 18:26, which would put the sun nearly 10 degrees up. Measuring the disk against the horizon gives an apparent elevation of 1.7 degrees, so the frame was taken about 19:09. The method was validated first against two frames with trusted timestamps and agreed to within 0.06 degrees."
+    },
+    {
+      "date": "2026-03-27",
+      "photos": ["IMG_3477.jpg"],
+      "shot_time": "19:32",
+      "sunset": "19:28",
+      "offset_min": 4,
+      "sun_elev_apparent": -0.27,
+      "sunset_azimuth": 274.3,
+      "offshore_50km": [37.793, -123.077],
+      "timestamp_confidence": "confirmed",
+      "weather": null,
+      "type": "full canvas",
+      "read": "The most developed sky in the collection. Extensive mid-level altocumulus in strong horizontal wave banding, at least three distinguishable layers, lit vivid orange-red from beneath, with a bright slot at the horizon where the sun had just gone. The wave structure implies wind shear across the layers.",
+      "revision": null,
+      "note": "In late March a frontal or upper-trough explanation is plausible, unlike in July. Retrieving this evening from the archive endpoint is the highest-value outstanding measurement — it is the cleanest out-of-sample test of the swing statistic, in a synoptic regime completely different from July."
+    },
+    {
+      "date": "2026-07-12",
+      "photos": ["IMG_4510.jpg"],
+      "shot_time": "20:32",
+      "sunset": "20:33",
+      "offset_min": -1,
+      "sun_elev_apparent": 0.56,
+      "sunset_azimuth": 298.8,
+      "offshore_50km": [37.976, -123.009],
+      "timestamp_confidence": "confirmed",
+      "weather": {
+        "cc_low": 4, "cc_mid": 99, "cc_high": 99,
+        "visibility_km": 20.1, "rh": 75, "dew_c": 12.5, "mslp": 1012.8,
+        "rh_pre_min": 75, "vis_pre_max_km": 19.2, "dew_pre_min_c": 12.5,
+        "low_trace": [8, 4, 5, 4, 47, 100, 50],
+        "swing": 96, "swing_rank": 2
+      },
+      "offshore": null,
+      "type": "full canvas",
+      "read": "Extensive altocumulus in a mackerel-scale undulating pattern with finer cirrus above, all lit gold from underneath, blue showing through the gaps, clear pale slot at the horizon. Shot from further north looking past Seal Rocks toward Point Reyes.",
+      "revision": "Confirmed by the data: mid cloud 99 percent, high cloud 99 percent, low cloud 4 percent. When cloud has visible texture the photographic read holds up exactly.",
+      "note": "The deck burned back through the afternoon from 81 percent at 11:00 to single figures by evening while mid and high cloud moved in above it. Then it shut — 47 percent by 22:00 and 100 percent by 23:00. The window was two to three hours wide and closed within ninety minutes of the shutter. Colour was still gold rather than pink, so peak intensity on that deck probably arrived ten to fifteen minutes later."
+    },
+    {
+      "date": "2026-07-21",
+      "photos": ["IMG_4703.jpg", "IMG_4717.jpg"],
+      "shot_time": "20:27",
+      "sunset": "20:28",
+      "offset_min": -1,
+      "sun_elev_apparent": 0.54,
+      "sunset_azimuth": 296.6,
+      "offshore_50km": [37.962, -123.019],
+      "timestamp_confidence": "confirmed",
+      "weather": {
+        "cc_low": 0, "cc_mid": 0, "cc_high": 0,
+        "visibility_km": 23.9, "rh": 68, "dew_c": 14.1, "mslp": 1012.9,
+        "rh_pre_min": 36, "vis_pre_max_km": 54.5, "dew_pre_min_c": 6.7,
+        "low_trace": [0, 0, 7, 0, 52, 78, 99],
+        "swing": 99, "swing_rank": 1
+      },
+      "offshore": null,
+      "type": "clear, underexposed",
+      "read": "Originally read as a thick featureless overcast across the whole dome with an intense red-orange band compressed into the bottom few degrees and the disk on the waterline.",
+      "revision": "Wrong. The data shows zero cloud at all three levels, the month's best visibility and its second-lowest humidity — three independent variables agreeing on genuinely clear, dry air. What looked like a deck was underexposed clear twilight sky, the phone having metered for the bright horizon band. The accompanying aerosol read was wrong for the same reason: this was the cleanest air of the month, not the haziest.",
+      "note": "The most anomalous evening in the record. Between 17:00 and 19:00 visibility climbed to 54.5 km while humidity collapsed to 36 percent and the dew point fell to 6.7 C — a dry offshore air mass with the marine layer entirely scoured out. The next-driest July evening was 72 percent humidity, so this is off the distribution rather than at the top of it. At the sunset hour it reversed, and the deck then flooded in: 52 percent by 21:00, 99 percent by 23:00. The dark striations in the horizon band were most likely the leading edge of that returning marine air."
+    },
+    {
+      "date": "2026-07-27",
+      "photos": ["IMG_4769.jpg", "IMG_4770.jpg"],
+      "shot_time": "20:19",
+      "sunset": "20:23",
+      "offset_min": -4,
+      "sun_elev_apparent": 0.53,
+      "sunset_azimuth": 295.0,
+      "offshore_50km": [37.949, -123.026],
+      "timestamp_confidence": "confirmed",
+      "weather": {
+        "cc_low": 99, "cc_mid": 0, "cc_high": 0,
+        "visibility_km": 14.3, "rh": 87, "dew_c": 13.8, "mslp": 1014.8,
+        "rh_pre_min": 81, "vis_pre_max_km": 16.2, "dew_pre_min_c": 14.3,
+        "low_trace": [31, 80, 54, 99, 11, 13, 20],
+        "swing": 88, "swing_rank": 3
+      },
+      "offshore": null,
+      "type": "deck overhead, underlit",
+      "read": "Originally read as essentially cloudless above with a single sharply defined band sitting well offshore. Large, deep orange, refraction-flattened disk about one diameter above the water.",
+      "revision": "Partly wrong. Low cloud was 99 percent at the sunset hour. The smooth orange gradient filling the frame was the lit underside of the marine layer, and the band near the horizon was its seaward edge seen nearly edge-on — a deck at 400 m converges toward the horizon as it recedes, which is what an edge 50 km out looks like.",
+      "note": "Moist and hazy all day, humidity never below 81 percent and visibility never better than 16 km. The deck thinned to about 30 percent mid-afternoon, rebuilt to 99 percent exactly at the sunset hour, then collapsed to 11 percent within the hour — the largest single-hour change in the month. Highest pressure of the three July evenings."
+    }
+  ]
+}
