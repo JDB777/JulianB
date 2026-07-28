@@ -4,78 +4,180 @@
     "lat": 37.7594,
     "lon": -122.5107,
     "grid_point": "37.775 N, 122.488 W",
-    "weather_source": "Open-Meteo (ERA5 reanalysis / forecast archive)"
+    "weather_source": "Open-Meteo. July 2026 from the forecast endpoint; February and March 2026 from the Historical Forecast API, which reproduced the July values exactly."
   },
   "notes_on_method": {
     "swing": "Range of low cloud cover across the window from 2 h before sunset to 3 h after. Measures the marine layer edge transiting the station. Across 20 July evenings, the three photographed evenings ranked 1st, 2nd and 3rd on this statistic.",
-    "caution": "Swing was identified after noticing the pattern in three evenings, so it is a post-hoc statistic awaiting out-of-sample confirmation.",
+    "caution": "Swing was identified after noticing the pattern in three July evenings, and has now been tested out of sample on the three non-July evenings. It failed. Their swings were 0, 9 and 4, ranking 20th, 5th and 11th of the 21 evenings in their surrounding windows — an average rank of 12th, which is what picking at random would give. The statistic describes July and does not generalise beyond it.",
     "visual_reads": "Cloud identified from photographs is reliable when the cloud has visible texture. In frames exposed for the horizon band, a uniformly lit deck and clear sky are not distinguishable, and two early reads were wrong in opposite directions."
   },
   "evenings": [
     {
       "date": "2026-02-20",
-      "photos": ["IMG_1851.jpg"],
+      "photos": [
+        "IMG_1851.jpg"
+      ],
       "shot_time": "18:18",
       "sunset": "17:54",
       "offset_min": 24,
       "sun_elev_apparent": -4.12,
       "sunset_azimuth": 257.1,
-      "offshore_50km": [37.659, -123.064],
+      "offshore_50km": [
+        37.659,
+        -123.064
+      ],
       "timestamp_confidence": "year not stated, assumed 2026",
-      "weather": null,
+      "weather": {
+        "cc_low": 0,
+        "cc_mid": 71,
+        "cc_high": 0,
+        "visibility_km": 27.4,
+        "rh": 66,
+        "dew_c": 2.8,
+        "mslp": 1017.8,
+        "rh_pre_min": 61,
+        "vis_pre_max_km": 30.8,
+        "dew_pre_min_c": 3.3,
+        "low_trace": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "swing": 0,
+        "swing_rank": 20
+      },
       "type": "afterglow",
       "read": "Deep uniform amber across the whole sky with no disk, a dark low stratocumulus band silhouetted on the horizon and glow both above and below it. Almost no cloud aloft, so the colour is path length through clean air rather than anything catching light.",
-      "revision": null,
-      "note": "The only afterglow frame in the collection. Its existence overturned an earlier conclusion that these photographs were always taken at the sun rather than after it — that pattern was an artefact of a July-only sample. No magenta, which is what you expect without high cirrus."
+      "revision": "Corrected by the data. Mid-level cloud was 71 per cent, not the nearly empty sky the frame suggested, so the uniform amber was lit cloud rather than path length through clean air alone. Low cloud at the station was 0 per cent and visibility 27.4 km, so the open horizon slot in the read does hold. This is the texture problem again: an evenly lit deck seen 24 minutes after sunset carries no visible structure to read, and was mistaken for an empty sky.",
+      "note": "The only afterglow frame in the collection. Its existence overturned an earlier conclusion that these photographs were always taken at the sun rather than after it — that pattern was an artefact of a July-only sample. No magenta, which is what you expect without high cirrus, and the data agrees: high cloud 0 per cent. Low cloud held at 0 for the entire seven-hour window, a swing of 0 that ranks 20th of 21 in the surrounding window, even though six evenings in that window swung 70 points or more. The marine layer statistic that fitted July fails here outright."
     },
     {
       "date": "2026-03-18",
-      "photos": ["IMG_3255.jpg"],
+      "photos": [
+        "IMG_3255.jpg"
+      ],
       "shot_time": "19:09",
       "sunset": "19:20",
       "offset_min": -11,
       "sun_elev_apparent": 1.7,
       "sunset_azimuth": 269.9,
-      "offshore_50km": [37.758, -123.079],
+      "offshore_50km": [
+        37.758,
+        -123.079
+      ],
       "timestamp_confidence": "time corrected from 18:26 by measurement",
-      "weather": null,
+      "weather": {
+        "cc_low": 5,
+        "cc_mid": 0,
+        "cc_high": 0,
+        "visibility_km": 18.1,
+        "rh": 79,
+        "dew_c": 13.3,
+        "mslp": 1017.1,
+        "rh_pre_min": 72,
+        "vis_pre_max_km": 21.5,
+        "dew_pre_min_c": 13.7,
+        "low_trace": [
+          6,
+          4,
+          2,
+          5,
+          6,
+          4,
+          11
+        ],
+        "swing": 9,
+        "swing_rank": 5
+      },
       "type": "clean disk",
       "read": "Small, crisp, nearly white disk with container ships legible on the horizon. Thin cirrostratus streaks and two small dark altocumulus patches. Very low tide with wide wet sand and a long reflection.",
-      "revision": null,
-      "note": "The cleanest air in the collection — a white rather than reddened disk at low elevation means minimal aerosol and moisture. Stated time was 18:26, which would put the sun nearly 10 degrees up. Measuring the disk against the horizon gives an apparent elevation of 1.7 degrees, so the frame was taken about 19:09. The method was validated first against two frames with trusted timestamps and agreed to within 0.06 degrees."
+      "revision": "Corrected by the data. This was not the cleanest air in the collection but the haziest and dampest of the six evenings — visibility 18.1 km at 79 per cent humidity, against 27.4 km at 66 per cent on 20 February and 27.0 km at 64 per cent on 27 March. A white disk therefore does not indicate low aerosol here, and that inference should not be reused. The model also reports 0 per cent mid and high cloud against the cirrostratus streaks and altocumulus patches visible in the frame, which are small enough to fall below the resolution of a coarse grid cell.",
+      "note": "Stated time was 18:26, which would put the sun nearly 10 degrees up. Measuring the disk against the horizon gives an apparent elevation of 1.7 degrees, so the frame was taken about 19:09; the method was validated first against two frames with trusted timestamps and agreed to within 0.06 degrees. Open-Meteo puts sunset at 19:19, within a minute of the value computed independently. Low cloud stayed between 2 and 11 per cent across the window, a swing of 9."
     },
     {
       "date": "2026-03-27",
-      "photos": ["IMG_3477.jpg"],
+      "photos": [
+        "IMG_3477.jpg"
+      ],
       "shot_time": "19:32",
       "sunset": "19:28",
       "offset_min": 4,
       "sun_elev_apparent": -0.27,
       "sunset_azimuth": 274.3,
-      "offshore_50km": [37.793, -123.077],
+      "offshore_50km": [
+        37.793,
+        -123.077
+      ],
       "timestamp_confidence": "confirmed",
-      "weather": null,
+      "weather": {
+        "cc_low": 1,
+        "cc_mid": 17,
+        "cc_high": 6,
+        "visibility_km": 27.0,
+        "rh": 64,
+        "dew_c": 9.3,
+        "mslp": 1013.6,
+        "rh_pre_min": 58,
+        "vis_pre_max_km": 30.7,
+        "dew_pre_min_c": 9.7,
+        "low_trace": [
+          0,
+          0,
+          1,
+          1,
+          1,
+          3,
+          4
+        ],
+        "swing": 4,
+        "swing_rank": 11
+      },
       "type": "full canvas",
       "read": "The most developed sky in the collection. Extensive mid-level altocumulus in strong horizontal wave banding, at least three distinguishable layers, lit vivid orange-red from beneath, with a bright slot at the horizon where the sun had just gone. The wave structure implies wind shear across the layers.",
-      "revision": null,
-      "note": "In late March a frontal or upper-trough explanation is plausible, unlike in July. Retrieving this evening from the archive endpoint is the highest-value outstanding measurement — it is the cleanest out-of-sample test of the swing statistic, in a synoptic regime completely different from July."
+      "revision": "Partly contradicted by the data. The station cell reports only 17 per cent mid cloud and 6 per cent high against the extensive banded altocumulus filling the photograph. The read here is of strongly textured cloud, which is the case where reading cloud from a photograph is reliable, so the likelier explanation is that the cloud sat west of the station over open water — the frame looks out to sea while the grid cell sits inland of the beach. Offshore sampling for March has not been pulled and would settle it.",
+      "note": "In late March a frontal or upper-trough explanation is plausible, unlike in July. The archive retrieval this entry called for has now been made, and it went against the swing statistic: low cloud barely moved all evening, from 0 to 4 per cent, a swing of 4 that ranks 11th of the 21 evenings in the surrounding window. Whatever made this sky was not the marine layer edge crossing the station."
     },
     {
       "date": "2026-07-12",
-      "photos": ["IMG_4510.jpg"],
+      "photos": [
+        "IMG_4510.jpg"
+      ],
       "shot_time": "20:32",
       "sunset": "20:33",
       "offset_min": -1,
       "sun_elev_apparent": 0.56,
       "sunset_azimuth": 298.8,
-      "offshore_50km": [37.976, -123.009],
+      "offshore_50km": [
+        37.976,
+        -123.009
+      ],
       "timestamp_confidence": "confirmed",
       "weather": {
-        "cc_low": 4, "cc_mid": 99, "cc_high": 99,
-        "visibility_km": 20.1, "rh": 75, "dew_c": 12.5, "mslp": 1012.8,
-        "rh_pre_min": 75, "vis_pre_max_km": 19.2, "dew_pre_min_c": 12.5,
-        "low_trace": [8, 4, 5, 4, 47, 100, 50],
-        "swing": 96, "swing_rank": 2
+        "cc_low": 4,
+        "cc_mid": 99,
+        "cc_high": 99,
+        "visibility_km": 20.1,
+        "rh": 75,
+        "dew_c": 12.5,
+        "mslp": 1012.8,
+        "rh_pre_min": 75,
+        "vis_pre_max_km": 19.2,
+        "dew_pre_min_c": 12.5,
+        "low_trace": [
+          8,
+          4,
+          5,
+          4,
+          47,
+          100,
+          50
+        ],
+        "swing": 96,
+        "swing_rank": 2
       },
       "offshore": null,
       "type": "full canvas",
@@ -85,20 +187,42 @@
     },
     {
       "date": "2026-07-21",
-      "photos": ["IMG_4703.jpg", "IMG_4717.jpg"],
+      "photos": [
+        "IMG_4703.jpg",
+        "IMG_4717.jpg"
+      ],
       "shot_time": "20:27",
       "sunset": "20:28",
       "offset_min": -1,
       "sun_elev_apparent": 0.54,
       "sunset_azimuth": 296.6,
-      "offshore_50km": [37.962, -123.019],
+      "offshore_50km": [
+        37.962,
+        -123.019
+      ],
       "timestamp_confidence": "confirmed",
       "weather": {
-        "cc_low": 0, "cc_mid": 0, "cc_high": 0,
-        "visibility_km": 23.9, "rh": 68, "dew_c": 14.1, "mslp": 1012.9,
-        "rh_pre_min": 36, "vis_pre_max_km": 54.5, "dew_pre_min_c": 6.7,
-        "low_trace": [0, 0, 7, 0, 52, 78, 99],
-        "swing": 99, "swing_rank": 1
+        "cc_low": 0,
+        "cc_mid": 0,
+        "cc_high": 0,
+        "visibility_km": 23.9,
+        "rh": 68,
+        "dew_c": 14.1,
+        "mslp": 1012.9,
+        "rh_pre_min": 36,
+        "vis_pre_max_km": 54.5,
+        "dew_pre_min_c": 6.7,
+        "low_trace": [
+          0,
+          0,
+          7,
+          0,
+          52,
+          78,
+          99
+        ],
+        "swing": 99,
+        "swing_rank": 1
       },
       "offshore": null,
       "type": "clear, underexposed",
@@ -108,20 +232,42 @@
     },
     {
       "date": "2026-07-27",
-      "photos": ["IMG_4769.jpg", "IMG_4770.jpg"],
+      "photos": [
+        "IMG_4769.jpg",
+        "IMG_4770.jpg"
+      ],
       "shot_time": "20:19",
       "sunset": "20:23",
       "offset_min": -4,
       "sun_elev_apparent": 0.53,
       "sunset_azimuth": 295.0,
-      "offshore_50km": [37.949, -123.026],
+      "offshore_50km": [
+        37.949,
+        -123.026
+      ],
       "timestamp_confidence": "confirmed",
       "weather": {
-        "cc_low": 99, "cc_mid": 0, "cc_high": 0,
-        "visibility_km": 14.3, "rh": 87, "dew_c": 13.8, "mslp": 1014.8,
-        "rh_pre_min": 81, "vis_pre_max_km": 16.2, "dew_pre_min_c": 14.3,
-        "low_trace": [31, 80, 54, 99, 11, 13, 20],
-        "swing": 88, "swing_rank": 3
+        "cc_low": 99,
+        "cc_mid": 0,
+        "cc_high": 0,
+        "visibility_km": 14.3,
+        "rh": 87,
+        "dew_c": 13.8,
+        "mslp": 1014.8,
+        "rh_pre_min": 81,
+        "vis_pre_max_km": 16.2,
+        "dew_pre_min_c": 14.3,
+        "low_trace": [
+          31,
+          80,
+          54,
+          99,
+          11,
+          13,
+          20
+        ],
+        "swing": 88,
+        "swing_rank": 3
       },
       "offshore": null,
       "type": "deck overhead, underlit",
