@@ -1,0 +1,11 @@
+{
+  "name": "hearthlight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hearthlight: a one-screen tabletop game with an AI Dungeon Master",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.127.0",
+    "@supabase/supabase-js": "2.117.2"
+  }
+}

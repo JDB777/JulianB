@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hearthlight</title>
+<style>
+  :root {
+    --bg: #f6f3ee;      --panel: #fffdf9;   --ink: #241f1a;
+    --muted: #6d635a;   --line: #ddd3c6;    --accent: #8a3324;
+    --grid: #efe9df;    --grid2: #e9e2d6;   --move: #cfe3cc;
+    --wall: #6d635a;    --rough: #e3d3b3;
+    --hero: #2f5d8a;    --heroBg: #dce9f5;  --foe: #8a3324;  --foeBg: #f3ddd8;
+    --good: #2f6b3f;    --dead: #9a9188;    --on: #8a3324;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17140f;    --panel: #201c16;   --ink: #ece5da;
+      --muted: #9a8f82; --line: #3a332a;    --accent: #d4694f;
+      --grid: #241f19;  --grid2: #29241d;   --move: #2f4a33;
+      --wall: #6a6054;  --rough: #453a28;
+      --hero: #8fc0ec;  --heroBg: #1e2e3c;  --foe: #e8846b;  --foeBg: #3a221c;
+      --good: #7fbf8f;  --dead: #6a6054;    --on: #d4694f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17140f;      --panel: #201c16;   --ink: #ece5da;
+    --muted: #9a8f82;   --line: #3a332a;    --accent: #d4694f;
+    --grid: #241f19;    --grid2: #29241d;   --move: #2f4a33;
+    --wall: #6a6054;    --rough: #453a28;
+    --hero: #8fc0ec;    --heroBg: #1e2e3c;  --foe: #e8846b;  --foeBg: #3a221c;
+    --good: #7fbf8f;    --dead: #6a6054;    --on: #d4694f;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); overflow: hidden;
+    font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  /* ---- header: a thin strip, nothing more ---- */
+  header { flex: none; display: flex; align-items: center; gap: 14px;
+           padding: 7px 14px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: .95rem; margin: 0; letter-spacing: -0.01em; white-space: nowrap; }
+  header .spacer { flex: 1; }
+  .pill { font-size: .74rem; font-weight: 700; padding: 2px 9px; border-radius: 99px;
+          background: var(--grid); color: var(--muted); white-space: nowrap; }
+  .pill.turn { background: var(--accent); color: #fff; }
+  .pill.link { border: 0; cursor: pointer; font-family: inherit; }
+  .pill.warn { background: var(--accent); color: #fff; }
+
+  /* ---- the spending check-in: sits over the chat box until someone answers ---- */
+  .checkin { display: none; border: 2px solid var(--accent); border-radius: 8px;
+             padding: 10px 12px; background: var(--panel); }
+  .checkin.on { display: block; }
+  .checkin p { margin: 0 0 8px; }
+
+  /* ---- campaign picker ---- */
+  .picker { position: fixed; inset: 0; z-index: 60; display: none;
+            align-items: center; justify-content: center; padding: 16px;
+            background: rgba(0,0,0,.55); }
+  .picker.on { display: flex; }
+  .picker .card { width: min(480px, 100%); max-height: 90vh; overflow-y: auto;
+                  background: var(--panel); border: 1px solid var(--line);
+                  border-radius: 10px; padding: 18px; }
+  .picker h2 { margin: 0 0 10px; font-size: 1.1rem; }
+  .picker .camp { display: flex; width: 100%; justify-content: space-between; gap: 10px;
+                  margin-bottom: 6px; text-align: left; }
+  .picker .row { display: flex; gap: 8px; }
+  .picker input { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); font-size: .8rem; }
+  #hint { font-size: .78rem; color: var(--muted); overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---- top two thirds: the grid on the left, the conversation on the right ---- */
+  .boardarea { flex: 2 1 0; min-height: 0; display: grid; gap: 12px; padding: 10px;
+               grid-template-columns: minmax(0,1fr) 132px clamp(300px, 26%, 460px); }
+
+  /* ---- cast strip: who is in this fight, one face per kind ---- */
+  .caststrip { min-height: 0; overflow-y: auto; display: flex;
+               flex-direction: column; gap: 7px; }
+  .caststrip h2 { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em;
+                  color: var(--muted); margin: 2px 0 1px; font-weight: 700; }
+  .castcard { background: var(--panel); border: 1px solid var(--line);
+              border-radius: 8px; padding: 5px; cursor: pointer; flex: none;
+              transition: border-color .12s, transform .12s; }
+  .castcard:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .castcard img { width: 100%; aspect-ratio: 1; object-fit: cover;
+                  border-radius: 5px; display: block; background: var(--grid); }
+  .castcard .cap { font-size: .62rem; line-height: 1.25; margin-top: 4px;
+                   text-align: center; word-break: break-word; }
+  .castcard .sub { font-size: .56rem; color: var(--muted); text-align: center; }
+  .castcard.foe  { border-left: 3px solid var(--foe); }
+  .castcard.hero { border-left: 3px solid var(--hero); }
+  .castnote { font-size: .6rem; color: var(--muted); line-height: 1.35; }
+
+  /* ---- the rolled kit on the character sheet ---- */
+  .kit { border-left: 2px solid var(--line); padding: 3px 0 3px 7px; margin-top: 6px; }
+  .kitname { font-size: .82rem; font-weight: 700; display: flex;
+             justify-content: space-between; align-items: baseline; gap: 6px; }
+  .kitname .q { font-size: .58rem; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .05em; padding: 1px 5px; border-radius: 3px;
+                background: var(--grid2); color: var(--muted); }
+  .kitname .q.fine   { background: #2f4a33; color: #b9e0c0; }
+  .kitname .q.superb { background: var(--accent); color: #fff; }
+  .kitname .q.crude  { background: #3a2a24; color: #d8a08f; }
+  .kitline  { font-size: .7rem; color: var(--accent); }
+  .kitdet   { font-size: .68rem; color: var(--muted); line-height: 1.35; }
+  .kitflair { font-size: .66rem; color: var(--muted); font-style: italic;
+              opacity: .8; margin-top: 2px; }
+  .kit.pick { cursor: pointer; }
+  .kit.pick:hover  { border-left-color: var(--accent); }
+  .kit.chosen      { border-left-color: var(--accent); border-left-width: 3px; }
+  .kitname .inhand { font-size: .56rem; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .05em; color: var(--good); margin-left: 6px; }
+
+  /* ---- spotlight: the big "show everyone the picture" view ---- */
+  .spot { position: fixed; inset: 0; z-index: 50; display: none;
+          background: rgba(10,8,6,.93); padding: 24px;
+          align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+  .spot.on { display: flex; }
+  .spot img { max-width: min(96vw, 1400px); max-height: 82vh; object-fit: contain;
+              border-radius: 10px; box-shadow: 0 18px 60px rgba(0,0,0,.7); }
+  .spot .who { font-size: 1.05rem; font-weight: 700; }
+  .spot .meta { font-size: .72rem; color: var(--muted); }
+  .spot .close { position: absolute; top: 14px; right: 18px; font-size: 1.4rem;
+                 color: var(--muted); cursor: pointer; background: none;
+                 border: none; padding: 6px 10px; }
+  .spot .close:hover { color: var(--ink); }
+  .boardpane { min-width: 0; min-height: 0; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .68rem;
+            color: var(--muted); justify-content: center; flex: none; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .sw { width: 11px; height: 11px; border: 1px solid var(--line); border-radius: 2px;
+        display: inline-block; }
+
+  /* the chat: a tall transcript, a shorter box to type in */
+  .chatpane { min-height: 0; display: grid; gap: 10px;
+              grid-template-rows: minmax(0,1fr) auto minmax(84px, 26%); }
+  /* fixed rows, so the hidden check-in does not shift the chat box up into its row */
+  .chatpane > .chatlog { grid-row: 1; }  .chatpane > .checkin { grid-row: 2; }
+  .chatpane > .chatbox { grid-row: 3; }
+  .chatlog { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+             padding: 10px 12px; overflow-y: auto; min-height: 0;
+             display: flex; flex-direction: column; gap: 8px; }
+  .chatlog.empty { align-items: center; justify-content: center; text-align: center; }
+  .chatlog .placeholder { color: var(--muted); font-size: .85rem; max-width: 24ch; line-height: 1.5; }
+  .msg { max-width: 92%; padding: 6px 10px; border-radius: 10px; font-size: .82rem; line-height: 1.45; }
+  .msg.dm  { background: var(--grid); border: 1px solid var(--line); align-self: flex-start;
+             border-bottom-left-radius: 3px; }
+  .msg.you { background: var(--heroBg); border: 1px solid var(--hero); color: var(--ink);
+             align-self: flex-end; border-bottom-right-radius: 3px; }
+  .msg .lbl { display: block; font-size: .6rem; text-transform: uppercase; letter-spacing: .07em;
+              font-weight: 700; color: var(--muted); margin-bottom: 2px; }
+  .msg.sys { background: transparent; border: 0; color: var(--muted); font-style: italic;
+             align-self: center; font-size: .76rem; padding: 2px; }
+
+  .chatbox { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+             padding: 9px 10px; display: flex; flex-direction: column; gap: 7px; min-height: 0; }
+  .chatbox textarea { flex: 1; min-height: 0; resize: none; font: inherit; font-size: .84rem;
+             border: 0; outline: 0; background: transparent; color: var(--ink); }
+  .chatbox textarea::placeholder { color: var(--muted); }
+  .chatbox .foot { display: flex; align-items: center; gap: 8px; }
+  .chatbox .foot small { color: var(--muted); font-size: .68rem; flex: 1; }
+  /* 30 columns x 20 rows of TRUE SQUARES, so the board itself is 3:2.
+     A cell is five feet on a side and must look square; only the board is oblong. */
+  .boardwrap { aspect-ratio: 3 / 2; max-height: 100%; max-width: 100%; }
+  #board { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed;
+           font-variant-numeric: tabular-nums; }
+  #board th { font-size: .62rem; color: var(--ink); opacity: .55; font-weight: 700;
+              padding: 0 3px; letter-spacing: .02em; }
+  #board th.rowh { width: 22px; }
+  #board tr.head { height: 15px; }
+  #board td { border: 1px solid var(--line); background: var(--grid);
+              padding: 0; position: relative; }
+  #board td.alt   { background: var(--grid2); }
+  #board td.wall  { background: var(--wall); }
+  #board td.rough { background: var(--rough); }
+  #board td.reach { background: var(--move); cursor: pointer; }
+  #board td.reach:hover { outline: 2px solid var(--good); outline-offset: -2px; }
+  #board td.aim   { cursor: crosshair; outline: 2px dashed var(--accent); outline-offset: -3px; }
+
+  /* ---- a battle map behind the grid ----
+     Each cell carries its own slice of the picture rather than the table
+     carrying the whole thing, because the table has a header row and a header
+     column - a single background would sit 22px out and every square would
+     lie about what is on it. Sliced per cell, it lines up exactly whatever
+     the headers measure.
+     The terrain tints become translucent so the art shows through, but they
+     stay visible: the mask is still what the rules read. */
+  #board.scene td { background-color: transparent; border-color: rgba(255,255,255,.07); }
+  #board.scene td::before { content: ''; position: absolute; inset: 0; pointer-events: none; }
+  #board.scene td.wall::before  { background: rgba(8,6,4,.62); }
+  #board.scene td.rough::before { background: rgba(138,106,67,.34); }
+  #board.scene td.reach::before { background: rgba(47,74,51,.52); }
+  #board.scene td.alt::before   { background: rgba(255,255,255,.025); }
+
+  .cost  { position: absolute; bottom: 0; right: 2px; font-size: .45rem;
+           font-weight: 700; color: var(--good); line-height: 1.3; }
+
+  /* ---- tokens: name, health, and a slot for a picture ---- */
+  .tok { position: absolute; inset: 1px; border-radius: 4px; display: flex;
+         flex-direction: column; align-items: center; justify-content: center;
+         gap: 0; padding: 1px; overflow: hidden; }
+  .tok.hero { background: var(--heroBg); border: 1.5px solid var(--hero); }
+  .tok.foe  { background: var(--foeBg);  border: 1.5px solid var(--foe); }
+  .tok.ally { background: #223226; border: 1.5px solid var(--good); }
+  /* a token with art: the picture fills the square, the label sits on it */
+  .tok.art { background-size: cover; background-position: center top; }
+  .tok.art .pic { position: absolute; left: 1px; top: 0; font-size: .5rem;
+                  padding: 0 2px; border-radius: 3px; background: rgba(0,0,0,.6); }
+  .tok.dead { background: transparent; border: 1.5px dashed var(--dead); opacity: .6; }
+  .tok.act  { box-shadow: 0 0 0 2px var(--accent); }
+  /* an <img> drops straight into .pic when image generation arrives */
+  /* at this cell size the tag IS the token; an <img> replaces it later */
+  .pic { flex: none; width: 100%; height: 100%; border-radius: 3px;
+         display: grid; place-items: center; font-size: .62rem; font-weight: 800;
+         letter-spacing: -.02em; background: transparent; overflow: hidden; }
+  .pic img { width: 100%; height: 100%; object-fit: cover; }
+  .tokbody { display: none; }   /* names live in the panels and on hover now */
+  .nm { font-size: .56rem; font-weight: 700; line-height: 1.05;
+        overflow: hidden; word-break: break-word; }
+  .tok.hero .nm { color: var(--hero); }
+  .tok.foe  .nm { color: var(--foe); }
+  .tok.dead .nm { color: var(--dead); text-decoration: line-through; }
+  .tokhp { font-size: .5rem; font-weight: 600; color: var(--muted); }
+  .tok > .hpbar { position: absolute; left: 2px; right: 2px; bottom: 1px; margin: 0; width: auto; }
+  .hpbar { height: 2.5px; border-radius: 2px; background: rgba(128,128,128,.28);
+           margin: 2px auto 1px; width: 76%; }
+  .hpbar i { display: block; height: 100%; border-radius: 2px; background: var(--good); }
+  .hpbar.low i { background: var(--accent); }
+
+  /* ---- bottom third: everything else ---- */
+  .infoarea { flex: 1 1 0; min-height: 0; display: grid; gap: 9px;
+              grid-template-columns: 218px 1.15fr 1fr 1.35fr; padding: 0 10px 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+           padding: 9px 11px; overflow-y: auto; min-height: 0; }
+  .panel h2 { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em;
+              color: var(--muted); margin: 0 0 7px; font-weight: 700;
+              position: sticky; top: -9px; background: var(--panel); padding: 2px 0; }
+
+  button { font: inherit; font-size: .82rem; padding: 5px 10px; border-radius: 6px;
+           cursor: pointer; border: 1px solid var(--line);
+           background: var(--panel); color: var(--ink); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .33; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  select, input[type=text] { font: inherit; font-size: .8rem; padding: 4px 6px;
+           border-radius: 6px; width: 100%; border: 1px solid var(--line);
+           background: var(--panel); color: var(--ink); }
+  label.fld { display: block; font-size: .65rem; text-transform: uppercase;
+              letter-spacing: .05em; color: var(--muted); margin: 6px 0 2px; }
+
+  .stat { display: flex; justify-content: space-between; gap: 8px; font-size: .8rem; padding: 1px 0; }
+  .stat b { font-variant-numeric: tabular-nums; }
+  .bar { height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; margin: 3px 0 5px; }
+  .bar i { display: block; height: 100%; background: var(--good); }
+  .bar.low i { background: var(--accent); }
+
+  /* condition chips — click to toggle */
+  .conds { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .cond { font-size: .66rem; padding: 2px 7px; border-radius: 99px; cursor: pointer;
+          border: 1px solid var(--line); color: var(--muted); background: transparent;
+          user-select: none; }
+  .cond:hover { border-color: var(--accent); }
+  .cond.on { background: var(--on); border-color: var(--on); color: #fff; font-weight: 600; }
+
+  .enemy { display: flex; align-items: center; gap: 7px; padding: 3px 0;
+           border-bottom: 1px solid var(--line); }
+  .enemy:last-child { border-bottom: 0; }
+  .enemy .pic { width: 22px; height: 22px; font-size: .58rem;
+                background: rgba(128,128,128,.22); border-radius: 4px; }
+  .enemy .en { flex: 1; min-width: 0; }
+  .enemy .sq { font-size: .68rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .enemy.out .nm { color: var(--dead); text-decoration: line-through; }
+
+  #log { font-size: .78rem; line-height: 1.4; display: flex; flex-direction: column-reverse; }
+  #log p { margin: 0 0 5px; }
+  #log .d { color: var(--muted); }
+  #log .hit { color: var(--good); font-weight: 600; }
+  #log .miss { color: var(--muted); }
+  #log .crit { color: var(--accent); font-weight: 700; }
+  #log .beat { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 5px; color: var(--muted); }
+
+  code.save { display: block; background: var(--grid); padding: 6px 8px; border-radius: 5px;
+              font-size: .68rem; word-break: break-word; margin: 6px 0; line-height: 1.45; }
+
+  /* narrow windows: stack and allow scrolling rather than crushing everything */
+  @media (max-width: 1100px), (max-height: 520px) {
+    body { overflow: auto; }
+    .boardarea { flex: none; grid-template-columns: 1fr; }
+    .caststrip { flex-direction: row; overflow-x: auto; }
+    .caststrip h2, .castnote { display: none; }
+    .castcard { width: 96px; flex: none; }
+    .chatpane { grid-template-rows: 240px auto 120px; }
+    .boardwrap { aspect-ratio: 3 / 2; max-height: none; width: 100%; }
+    .infoarea { flex: none; grid-template-columns: 1fr; }
+    .panel { max-height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hearthlight</h1>
+  <button class="pill link" id="campaignpill" title="Switch campaign">no campaign</button>
+  <span class="pill" id="roundpill">no fight yet</span>
+  <span class="pill" id="turnpill" style="display:none"></span>
+  <span id="hint">Pick an archetype below and start a fight.</span>
+  <span class="spacer"></span>
+  <span class="pill" id="foespill">—</span>
+  <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
+  <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
+  <span class="pill" id="buildpill" title="build">h2</span>
+</header>
+
+<!-- the big view, for showing everyone at the table one picture -->
+<div class="spot" id="spot">
+  <button class="close" title="Close (Esc)">&times;</button>
+  <img alt="">
+  <div class="who"></div>
+  <div class="meta"></div>
+</div>
+
+<!-- choose a campaign: the save file every game belongs to -->
+<div class="picker" id="picker">
+  <div class="card">
+    <h2>Hearthlight</h2>
+    <div id="pickerlist"><p class="muted">Loading campaigns…</p></div>
+    <label class="fld" for="newcampaign">Or start a new one</label>
+    <div class="row">
+      <input type="text" id="newcampaign" maxlength="80" placeholder="Name it — e.g. The Drowned Kraken Mother">
+      <button id="bNewCampaign" class="primary">Start</button>
+    </div>
+    <p class="muted" id="pickernote"></p>
+  </div>
+</div>
+
+<div class="boardarea">
+  <div class="boardpane">
+    <div class="boardwrap"><table id="board"></table></div>
+
+    <div class="legend">
+      <span><i class="sw" style="background:var(--move)"></i> can reach</span>
+      <span><i class="sw" style="background:var(--rough)"></i> rubble, costs 2</span>
+      <span><i class="sw" style="background:var(--wall)"></i> wall</span>
+      <span><i class="sw" style="background:var(--heroBg);border-color:var(--hero)"></i> you</span>
+      <span><i class="sw" style="background:var(--foeBg);border-color:var(--foe)"></i> G1, G2… enemies</span>
+      <span>hover a token for its name and health</span>
+    </div>
+  </div>
+
+  <aside class="caststrip" id="caststrip"></aside>
+
+  <div class="chatpane">
+    <div class="chatlog empty" id="chatlog"></div>
+    <div class="checkin" id="checkin">
+      <p id="checkintext"></p>
+      <div class="row">
+        <button id="bKeepGoing" class="primary">Keep playing</button>
+        <button id="bStopHere">Stop here</button>
+      </div>
+    </div>
+    <div class="chatbox">
+      <textarea id="chatin" rows="2"
+        placeholder="Say what your character does — &quot;move to F6&quot;, &quot;attack Goblin #2&quot;, or just talk."></textarea>
+      <div class="foot">
+        <small id="chatnote">Enter to send · Shift+Enter for a new line</small>
+        <button id="bSend" class="primary">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="infoarea">
+
+  <section class="panel">
+    <h2>Setup</h2>
+    <label class="fld" for="pname">Character</label>
+    <input type="text" id="pname" value="Kira" maxlength="14">
+    <label class="fld" for="pick">Archetype</label>
+    <select id="pick"></select>
+    <label class="fld" for="nfoes">Enemies</label>
+    <select id="nfoes">
+      <option value="1">1 — Threat 1</option>
+      <option value="2" selected>2 — Threat 2</option>
+      <option value="3">3 — Threat 3</option>
+      <option value="4">4 — Threat 4</option>
+    </select>
+    <div class="row" style="margin-top:8px">
+      <button id="bStart" class="primary">Start fight</button>
+      <button id="bReset">Reset</button>
+    </div>
+    <label>Character</label>
+    <select id="who"></select>
+    <label class="fld" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="dmruns" checked> DM plays the others
+    </label>
+    <label>Scene</label>
+    <select id="scene"></select>
+    <div class="row" style="margin-top:6px">
+      <button id="bScene">Load scene</button>
+    </div>
+    <code class="save" id="saveline">—</code>
+    <div class="row">
+      <button id="bSave">Save</button>
+      <button id="bLoad">Resume</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Your character</h2>
+    <div id="hero"></div>
+    <h2 style="margin-top:9px">Actions</h2>
+    <div class="row">
+      <button id="bMove">Move</button>
+      <button id="bAttack" class="primary">Attack</button>
+      <button id="bDash">Dash</button>
+      <button id="bSpecial">Special</button>
+      <button id="bEnd">End turn</button>
+    </div>
+    <div class="row" id="abilities" style="margin-top:6px"></div>
+    <div class="row">
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Conditions</h2>
+    <div class="conds" id="conds"></div>
+    <div class="conds" id="sit" style="margin-top:6px"></div>
+    <p style="font-size:.7rem;color:var(--muted);margin:7px 0 0">
+      Click to toggle. Nearly every condition resolves into advantage,
+      disadvantage or Speed 0 — and the two annihilate each other.
+    </p>
+    <h2 style="margin-top:9px">Enemies</h2>
+    <div id="enemies"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ---------- board ------------------------------------------------------ */
+const COLS = 30, ROWS = 20;
+
+/* Spreadsheet column names: A..Z, then AA, AB, AC, AD. */
+function colName(x) {
+  let n = x + 1, out = '';
+  while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); }
+  return out;
+}
+const COL_NAMES = Array.from({ length: COLS }, (_, x) => colName(x));
+const sqName = (x, y) => COL_NAMES[x] + (y + 1);
+
+/* Terrain, built from shapes so it stays readable. */
+const vline = (c, r1, r2) => { const o = []; for (let r = r1; r <= r2; r++) o.push(c + r); return o; };
+const hline = (r, c1, c2) => { const o = []; for (let x = c1; x <= c2; x++) o.push(COL_NAMES[x] + r); return o; };
+const block = (c1, r1, c2, r2) => { const o = [];
+  for (let x = c1; x <= c2; x++) for (let r = r1; r <= r2; r++) o.push(COL_NAMES[x] + r); return o; };
+
+const WALLS = [
+  ...vline('H', 4, 8), ...vline('H', 12, 16),   /* a long wall with a gap at H9-H11 */
+  ...hline(3, 18, 22),                          /* S3-W3, the far barricade */
+  'E15', 'K17', 'X6', 'AB10'                    /* pillars */
+];
+const ROUGH = [
+  ...block(20, 9, 22, 12),                      /* U9-W12, a fall of rubble */
+  'F13', 'G13', 'M15', 'M16', 'Z4', 'AA4'
+];
+
+/* ---------- the nine conditions, rules/04-conditions.md ----------------- */
+/* youDis  : your rolls are at disadvantage
+   themAdv : attacks against you are at advantage
+   speed0  : your Speed is 0
+   youAdv  : your attacks are at advantage
+   themDis : attacks against you are at disadvantage
+   noAct   : you cannot act at all                                        */
+const CONDITIONS = {
+  blinded:    { youDis:1, themAdv:1 },
+  charmed:    { },
+  frightened: { youDis:1 },
+  grappled:   { speed0:1 },
+  invisible:  { youAdv:1, themDis:1 },
+  poisoned:   { youDis:1 },
+  prone:      { themAdv:1 },
+  restrained: { speed0:1, youDis:1, themAdv:1 },
+  stunned:    { noAct:1, themAdv:1, speed0:1 }
+};
+
+/* ---------- archetypes, from rules/06-archetypes.md -------------------- */
+const ARCHETYPES = {
+  Vanguard:  { ac:18, hp:30, speed:5, dex:1,
+               attacks:[{n:'Longsword',hit:5,dice:[1,8],bonus:3,range:1},
+                        {n:'Heavy Crossbow',hit:3,dice:[1,10],bonus:1,range:24}],
+               extraAttack:true, special:'Second Wind' },
+  Shadow:    { ac:15, hp:24, speed:7, dex:3,
+               attacks:[{n:'Shortsword',hit:5,dice:[1,6],bonus:3,range:1},
+                        {n:'Shortbow',hit:5,dice:[1,6],bonus:3,range:16}],
+               sneak:true, special:'Cunning Action' },
+  Arcanist:  { ac:12, hp:20, speed:6, dex:2,
+               attacks:[{n:'Fire Bolt',hit:5,dice:[1,10],bonus:0,range:24}],
+               special:'Magic Missile' },
+  Warden:    { ac:17, hp:26, speed:5, dex:0,
+               attacks:[{n:'Mace',hit:4,dice:[1,6],bonus:2,range:1}],
+               special:'Cure Wounds' },
+  Hunter:    { ac:15, hp:25, speed:7, dex:3,
+               attacks:[{n:'Longbow',hit:5,dice:[1,8],bonus:3,range:30},
+                        {n:'Shortswords',hit:5,dice:[1,6],bonus:3,range:1}],
+               twoWeapon:true, special:"Hunter's Mark" },
+  Berserker: { ac:15, hp:35, speed:7, dex:2,
+               attacks:[{n:'Greataxe',hit:5,dice:[1,12],bonus:3,range:1}],
+               special:'Rage' },
+  Skald:     { ac:14, hp:23, speed:6, dex:2,
+               attacks:[{n:'Vicious Mockery',hit:null,save:13,dice:[1,4],bonus:0,range:12}],
+               special:'Bardic Inspiration' },
+  Oathsworn: { ac:18, hp:28, speed:5, dex:0,
+               attacks:[{n:'Longsword',hit:5,dice:[1,8],bonus:3,range:1}],
+               special:'Divine Smite' }
+};
+
+/* GOBLIN — rules/07-monsters.md, Threat 1 */
+const GOBLIN = { ac:15, hp:7, speed:6, hit:4, dice:[1,6], bonus:2 };
+const PARTY_STARTS = ['D9', 'C11', 'E12'];
+const FOE_STARTS = ['L4','N7','P11','R14'];   /* 8, 10, 12 and 14 squares out */
+
+/* ---------- state ------------------------------------------------------ */
+let S = null, reach = {}, aiming = false;
+
+function freshState(name, archetype, nFoes) {
+  const seats = PARTY.length ? PARTY : [{ name: name || archetype, archetype, kit: [] }];
+  return {
+    chars: seats.map((p, i) => makeChar(p, i)),
+    active: 0, order: [], slot: 0,
+    archetype,                                   /* the seat the human picked */
+    foes: Array.from({ length: nFoes }, (_, i) => ({
+            id: i + 1, name: `Goblin #${i + 1}`, at: FOE_STARTS[i],
+            hp: GOBLIN.hp, max: GOBLIN.hp, fleeing: false, dead: false, gone: false })),
+    round: 0, turn: null, started: false, mode: null, acted: false, log: [], chat: []
+  };
+}
+
+/* One seat at the table. Everything that used to hang off S.hero now hangs off
+   each of these, because three characters need three sets of hit points,
+   three positions and three turns. */
+function makeChar(p, i) {
+  const a = ARCHETYPES[p.archetype] || ARCHETYPES.Vanguard;
+  return {
+    name: p.name, archetype: p.archetype, kit: p.kit || [],
+    gender: p.gender || '', species: p.species || '',
+    at: PARTY_STARTS[i] || FOE_STARTS[i] || 'D10',
+    hp: a.hp, max: a.hp, moved: 0, dashed: false,
+    dying: false, dead: false, saves: 0, fails: 0, raging: false,
+    usedSpecial: false, smiting: false, uses: 4, weapon: null,
+    cond: {}, sit: {}, dmRun: false
+  };
+}
+
+/* the character whose turn it is - or the one the human picked, before a
+   fight starts */
+const me = () => (S && S.chars && S.chars[S.active]) || null;
+const upCount = () => S.chars.filter(c => !c.dead).length;
+/* characters still on their feet, and the one a monster at `sq` would go for */
+const standing = () => S.chars.filter(c => !c.dead);
+const nearestFoeName = () => {
+  const l = living();
+  if (!l.length) return 'nothing';
+  return l.sort((a, b) => cheb(me().at, a.at) - cheb(me().at, b.at))[0].name;
+};
+function nearestChar(sq) {
+  const up = S.chars.filter(c => !c.dead && !c.dying);
+  const pool = up.length ? up : standing();
+  return pool.sort((a, b) => cheb(sq, a.at) - cheb(sq, b.at))[0] || null;
+}
+
+const living  = () => S.foes.filter(f => !f.dead && !f.gone);
+const onBoard = () => S.foes.filter(f => !f.gone);
+const foeAt   = sq => onBoard().find(f => f.at === sq);
+const has     = c => !!(S && me().cond[c]);
+
+/* Fold the active conditions into one set of effects. */
+function effects(who) {
+  const e = { youDis:0, themAdv:0, speed0:0, youAdv:0, themDis:0, noAct:0 };
+  if (!S) return e;
+  const c0 = who || me();            /* any character, not only the active one */
+  if (!c0) return e;
+  for (const c in c0.cond) if (c0.cond[c])
+    for (const k in CONDITIONS[c]) e[k] = 1;
+  /* situational, set by hand: the fiction the DM would rule on */
+  if (c0.sit && c0.sit.advantage)    e.youAdv = 1;
+  if (c0.sit && c0.sit.disadvantage) e.youDis = 1;
+  return e;
+}
+
+/* ---------- geometry --------------------------------------------------- */
+const toXY = s => {
+  const m = /^([A-Za-z]+)(\d+)$/.exec(s);
+  if (!m) return [-1, -1];
+  let x = 0;
+  for (const ch of m[1].toUpperCase()) x = x * 26 + (ch.charCodeAt(0) - 64);
+  return [x - 1, parseInt(m[2], 10) - 1];
+};
+const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+/* A loaded scene replaces the demo's hand-made terrain with that map's mask,
+   so the rules read the same squares the picture shows. Without this the
+   painted map and the walls would disagree, which is the one thing the whole
+   mask design exists to prevent. */
+let SCENE = null;            /* { asset, terrain:[20 strings of 30] } */
+
+function sceneCode(s) {
+  if (!SCENE) return null;
+  const x = COL_NAMES.indexOf(s.match(/^[A-Z]+/)[0]);
+  const y = parseInt(s.match(/\d+$/)[0], 10) - 1;
+  if (x < 0 || y < 0 || y >= SCENE.terrain.length) return null;
+  return SCENE.terrain[y][x] || '.';
+}
+
+const isWall  = s => SCENE ? sceneCode(s) === '#' : WALLS.includes(s);
+const isRough = s => SCENE ? ':~'.includes(sceneCode(s)) : ROUGH.includes(s);
+const cheb = (a, b) => { const [ax,ay]=toXY(a), [bx,by]=toXY(b); return Math.max(Math.abs(ax-bx), Math.abs(ay-by)); };
+
+/* 1 per step, diagonals included; rubble costs 2 to enter. */
+function reachable(from, budget, blocked) {
+  const cost = { [from]: 0 }, queue = [from];
+  while (queue.length) {
+    queue.sort((a,b) => cost[a] - cost[b]);
+    const cur = queue.shift();
+    const [cx, cy] = toXY(cur);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      if (!dx && !dy) continue;
+      const nx = cx + dx, ny = cy + dy;
+      if (!inBounds(nx, ny)) continue;
+      const n = sqName(nx, ny);
+      if (isWall(n) || blocked.includes(n)) continue;
+      const c = cost[cur] + (isRough(n) ? 2 : 1);
+      if (c <= budget && (cost[n] === undefined || c < cost[n])) { cost[n] = c; queue.push(n); }
+    }
+  }
+  delete cost[from];
+  return cost;
+}
+
+/* Half cover: a wall on the straight line between two squares. +2 AC. */
+function hasCover(from, to) {
+  const [x0,y0] = toXY(from), [x1,y1] = toXY(to);
+  const steps = Math.max(Math.abs(x1-x0), Math.abs(y1-y0));
+  for (let i = 1; i < steps; i++) {
+    const x = Math.round(x0 + (x1-x0) * i / steps);
+    const y = Math.round(y0 + (y1-y0) * i / steps);
+    if (isWall(sqName(x, y))) return true;
+  }
+  return false;
+}
+
+/* ---------- dice ------------------------------------------------------- */
+const d = n => 1 + Math.floor(Math.random() * n);
+/* Advantage and disadvantage annihilate — rules/00-core-loop.md */
+function d20(adv, dis) {
+  const a = d(20), b = d(20);
+  if (adv && !dis) return { roll: Math.max(a,b), note: ` (adv ${a}/${b})` };
+  if (dis && !adv) return { roll: Math.min(a,b), note: ` (dis ${a}/${b})` };
+  return { roll: a, note: '' };
+}
+const rollDice = ([n, faces]) => { let t = 0; for (let i = 0; i < n; i++) t += d(faces); return t; };
+
+/* ---------- log -------------------------------------------------------- */
+function say(html, cls) { S.log.unshift({ html, cls: cls || '' }); drawLog(); }
+function drawLog() {
+  document.getElementById('log').innerHTML =
+    S.log.map(e => `<p class="${e.cls}">${e.html}</p>`).join('');
+}
+/* "the Night Wolf Father" should read NW, not TN - an article is not a name */
+const initials = n => n.replace(/[^A-Za-z0-9 #]/g,'').split(/\s+/)
+  .filter(w => w && !/^(the|a|an|of)$/i.test(w))
+  .map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+/* ---------- the conversation ------------------------------------------- */
+/* The DM's prose lives here; the Log panel keeps the dice. Typed commands are
+   resolved locally by runCommand(); anything else goes to Claude via askDM().  */
+function narrate(text)  { if (!S) return; S.chat.push({ who: 'dm',  text }); drawChat(); }
+function youSaid(text)  { if (!S) return;
+  // captured now, not at render time, or the whole backlog gets relabelled
+  S.chat.push({ who: 'you', name: me() ? me().name : 'You', text }); drawChat(); }
+function sysLine(text)  { if (!S) return; S.chat.push({ who: 'sys', text }); drawChat(); }
+
+function drawChat() {
+  const el = document.getElementById('chatlog');
+  if (!S || !S.chat.length) {
+    el.className = 'chatlog empty';
+    el.innerHTML = '<p class="placeholder">The Dungeon Master will narrate here. Start a fight, then talk to it.</p>';
+    return;
+  }
+  el.className = 'chatlog';
+  el.innerHTML = S.chat.map(m => m.who === 'sys'
+    ? `<div class="msg sys">${m.text}</div>`
+    : `<div class="msg ${m.who}"><span class="lbl">${m.who === 'dm' ? 'Dungeon Master' : (m.name || 'You')}</span>${m.text}</div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+/* Understands a few plain-English commands so the box does something real
+   before the AI DM exists. Returns true when it handled the line. */
+function runCommand(raw) {
+  const t = raw.toLowerCase().trim();
+
+  /* A question is not an order. "How many times can Mordai attack?" matched
+     the attack verb and swung the axe. Anything that reads as a question goes
+     to the DM to answer, and nothing is executed. */
+  if (/\?\s*$/.test(t) ||
+      /^(what|who|where|when|why|how|can|could|should|may|is|are|do|does|did|am)/.test(t)) {
+    return false;
+  }
+
+  if (!S || !S.started) { sysLine('No fight is running — press Start fight first.'); return true; }
+  if (S.turn !== 'hero') { sysLine('The enemy is moving.'); return true; }
+
+  /* Naming a character who is not up used to act on whoever WAS up. Order is
+     kept, but it is said the way a DM would say it. */
+  const named = S.chars.find(c => {
+    const first = c.name.split(' ')[0].toLowerCase();
+    return t.includes(first) || t.includes(c.name.toLowerCase());
+  });
+  if (named && named !== me()) {
+    sysLine(`It is <b>${me().name}</b>'s turn — ${named.name} will get their moment.`);
+    return true;
+  }
+
+  const sq = (t.match(/\b([a-z]{1,2})\s?(\d{1,2})\b/i) || []);
+  /* \w* so conjugations count: "Orla moves to H6" used to fall through to the
+     DM, which then narrated a move the engine never made and contradicted
+     itself a turn later. */
+  const wantsMove = /\b(move|go|goes|walk|run|step|head|advance|approach|charge|retreat)\w*/.test(t);
+  const wantsAttack = /\b(attack|hit|strike|swing|stab|shoot|slash|fire|loose)\w*/.test(t);
+
+  /* "move as close as he can" - a move with no square named. Very common, and
+     without it the request reaches the DM, which cannot move anyone. */
+  if (wantsMove && !sq[1] && /\b(close|closer|toward|towards|nearer|near|at)\b/.test(t)) {
+    const marks = living();
+    if (!marks.length) { sysLine('Nothing left to close on.'); return true; }
+    const named = marks.find(f => t.includes(f.name.toLowerCase())) || marks[0];
+    reach = reachable(me().at, budget() - me().moved, marks.map(f => f.at));
+    const best = Object.keys(reach)
+      .sort((a, b) => cheb(a, named.at) - cheb(b, named.at) || reach[a] - reach[b])[0];
+    if (!best || cheb(best, named.at) >= cheb(me().at, named.at)) {
+      sysLine(`No closer square to ${named.name} is in reach this turn.`);
+      S.mode = 'move'; draw(); return true;
+    }
+    S.mode = 'move'; moveTo(best);
+    sysLine(`Moved to <b>${best}</b> — ${cheb(best, named.at)} squares from ${named.name}.`);
+    return true;
+  }
+
+  if (wantsMove && sq[1]) {
+    const target = sq[1].toUpperCase() + parseInt(sq[2], 10);
+    if (!COL_NAMES.includes(sq[1].toUpperCase()) || parseInt(sq[2], 10) > ROWS) {
+      sysLine(`${target} is not on the board.`); return true;
+    }
+    reach = reachable(me().at, budget() - me().moved, living().map(f => f.at));
+    if (reach[target] === undefined) {
+      sysLine(`${target} is out of reach this turn.`);
+      S.mode = 'move'; draw();
+    } else { S.mode = 'move'; moveTo(target); }
+    return true;
+  }
+  if (wantsAttack) {
+    const num = (t.match(/#?\s?([1-4])\b/) || [])[1];
+    const targets = living().filter(inRange);
+    if (!targets.length) { attack(); return true; }
+    const pick = num ? targets.find(f => String(f.id) === num) : targets[0];
+    if (!pick) { sysLine(`Goblin #${num} is not in reach.`); return true; }
+    doAttack(pick);
+    return true;
+  }
+  if (/\bdash\b/.test(t))                              { dash(); return true; }
+  /* "end mordai's turn" used to miss this and fall through to the DM, which
+     then narrated instead of ending anything. */
+  if (/\b(end|finish)\b[^.!?]*\bturn\b/.test(t) || /^\s*(done|pass)\s*$/.test(t)) {
+    endTurn(); return true;
+  }
+  if (/\b(rage|second wind|smite|special)\b/.test(t))  { special(); return true; }
+  return false;
+}
+
+/* ---------- actions the DM asks for ------------------------------------
+   The DM may PROPOSE an action; the engine decides whether it happens. Every
+   proposal runs through the same checks a typed command does, so the DM can
+   move you but cannot move you somewhere illegal, and cannot decide a hit.
+   A refusal is reported plainly - the board is the authority, not the prose. */
+function applyActions(actions) {
+  if (!Array.isArray(actions) || !actions.length) return;
+  if (!S || !S.started) return;
+
+  for (const a of actions.slice(0, 3)) {      // a turn is not a whole sequence
+    if (S.turn !== 'hero') { sysLine('The Dungeon Master tried to act out of turn.'); return; }
+
+    if (a.kind === 'move') {
+      const target = String(a.square || '').toUpperCase();
+      const m = target.match(/^([A-Z]{1,2})(\d{1,2})$/);
+      if (!m || !COL_NAMES.includes(m[1]) || +m[2] < 1 || +m[2] > ROWS) {
+        sysLine(`The Dungeon Master asked for ${target || 'nowhere'}, which is not on the board.`);
+        continue;
+      }
+      reach = reachable(me().at, budget() - me().moved, living().map(f => f.at));
+      if (reach[target] === undefined) {
+        sysLine(`${target} is out of reach this turn — you stay at <b>${me().at}</b>.`);
+        S.mode = 'move'; draw();
+        continue;
+      }
+      S.mode = 'move'; moveTo(target);
+
+    } else if (a.kind === 'closer') {
+      const marks = living();
+      if (!marks.length) continue;
+      const named = marks.find(f => a.target &&
+                    f.name.toLowerCase().includes(String(a.target).toLowerCase())) || marks[0];
+      reach = reachable(me().at, budget() - me().moved, marks.map(f => f.at));
+      const best = Object.keys(reach)
+        .sort((x, y) => cheb(x, named.at) - cheb(y, named.at) || reach[x] - reach[y])[0];
+      if (!best || cheb(best, named.at) >= cheb(me().at, named.at)) {
+        sysLine(`No closer square to ${named.name} is in reach — you stay at <b>${me().at}</b>.`);
+        continue;
+      }
+      S.mode = 'move'; moveTo(best);
+      sysLine(`Moved to <b>${best}</b> — ${cheb(best, named.at)} squares from ${named.name}.`);
+
+    } else if (a.kind === 'attack') {
+      const targets = living().filter(inRange);
+      if (!targets.length) { sysLine('Nothing is in reach to attack.'); continue; }
+      const pick = (a.target && targets.find(f =>
+                    f.name.toLowerCase().includes(String(a.target).toLowerCase()))) || targets[0];
+      doAttack(pick);
+
+    } else if (a.kind === 'use') {
+      const list = myAbilities();
+      const pick = list.find(x => x.name.toLowerCase()
+                        .includes(String(a.ability || '').toLowerCase())) || list[0];
+      if (!pick) { sysLine(`${me().name} has no ability to use.`); continue; }
+      useAbility(pick, a.target);
+
+    } else if (a.kind === 'check') {
+      const abil = (a.stat || 'DEX').toUpperCase();
+      const mod = ({ STR: 'str', DEX: 'dex', CON: 'con',
+                     INT: 'int', WIS: 'wis', CHA: 'cha' })[abil];
+      const bonus = (ARCHETYPES[me().archetype] || {})[mod] || 0;
+      const r = d(20), total = r + bonus;
+      const dc = a.dc || 15;
+      say(`${me().name} — ${abil} check: ${r} + ${bonus} = <b>${total}</b> vs DC ${dc}. `
+        + (total >= dc ? '<span class="hit">It works.</span>'
+                       : '<span class="miss">It does not.</span>'), 'd');
+      record(`${me().name} tried something off the board: ${abil} check, `
+           + `${total} against DC ${dc} - ${total >= dc ? 'success' : 'failure'}.`);
+      S.acted = true; draw(); narrateOutcome(PHASE.RESOLVED);
+    } else if (a.kind === 'dash')     { dash(); }
+    else if (a.kind === 'special')    { special(); }
+    else if (a.kind === 'end_turn')   { endTurn(); }
+  }
+}
+
+/* Ask the real Dungeon Master. The key lives on the server; this only ever
+   sends what was typed plus the board everyone can already see. */
+let dmBusy = false;
+let youHeard = '';
+
+/* What the DM is told about the ground.
+   This is DERIVED from the same isWall/isRough the movement rules use, rather
+   than from the WALLS and ROUGH lists, because those are only the demo's own
+   terrain. Sending them meant that with a scene loaded the DM described a wall
+   at H4-H8 that the map does not have and the engine would happily walk
+   through. One source of truth, so the two cannot disagree again. */
+function terrainForDM() {
+  const walls = [], rough = [], cover = [], water = [], hazard = [], pit = [], door = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const s = sqName(x, y);
+    if (isWall(s)) { walls.push(s); continue; }
+    const c = sceneCode(s);
+    if (c === '~') water.push(s);
+    else if (c === 'o') cover.push(s);
+    else if (c === '!') hazard.push(s);
+    else if (c === 'v') pit.push(s);
+    else if (c === '+') door.push(s);
+    if (isRough(s)) rough.push(s);
+  }
+  return { cols: COLS, rows: ROWS, first: COL_NAMES[0], last: COL_NAMES[COLS - 1],
+           scene: SCENE ? SCENE.asset.name : null,
+           walls, rough, cover, water, hazard, pit, door };
+}
+
+/* ---------- the phase machine ------------------------------------------
+   The DM used to receive a pile of state and work out what KIND of moment it
+   was. Now the app says so, and each phase has exactly one job. That is the
+   thinking we are taking off it.
+
+     awaiting   name whoever is up, describe, ask
+     resolved   narrate the outcome the engine has just handed over
+     enemy      narrate what the monsters did
+     between    one line as the round turns
+
+   Alongside the phase goes the exact menu of legal actions, computed here
+   from the rules. The DM chooses from a list instead of reasoning about
+   geometry, so an illegal action is never offered rather than refused. */
+const PHASE = { AWAIT: 'awaiting', RESOLVED: 'resolved',
+                ENEMY: 'enemy', BETWEEN: 'between' };
+
+let OUTCOME = [];                       /* what the engine did, in plain words */
+const record = line => OUTCOME.push(line);
+
+/* Second beat. The engine has rolled; now the DM says what that looked like.
+   Narrating BEFORE the dice is how 'your bolt scorched him' appeared before
+   any roll had happened. */
+function narrateOutcome(phase) {
+  if (!OUTCOME.length || !S || !S.started) { OUTCOME = []; return; }
+  const lines = OUTCOME.slice();
+  OUTCOME = [];
+  askDM('', { phase: phase || PHASE.RESOLVED, outcome: lines });
+}
+
+function legalActions() {
+  const c = me();
+  if (!S || !S.started || S.turn !== 'hero' || !c || c.dead || c.dying) return null;
+  const e = effects();
+  const left = budget() - c.moved;
+  const squares = e.speed0 ? {} : reachable(c.at, left, living().map(f => f.at));
+
+  return {
+    who: c.name,
+    movementLeft: e.speed0 ? 0 : left,
+    /* capped: the DM does not need all 300, only that they are options */
+    moveTo: Object.keys(squares).slice(0, 60),
+    attacks: S.acted ? [] : living().flatMap(f =>
+      myAttacks().filter(w => cheb(c.at, f.at) <= w.range).map(w => ({
+        target: f.name, weapon: w.n, bonus: w.hit,
+        damage: `${w.dice[0]}d${w.dice[1]}+${w.bonus}`,
+        distance: cheb(c.at, f.at) }))),
+    abilities: (S.acted || c.uses <= 0) ? [] : myAbilities().map(k => ({
+      name: k.name, does: k.detail, range: k.range,
+      dc: k.slot === 'Healing ability' ? null : 15 + k.mod })),
+    spellUses: c.uses,
+    canDash: !S.acted && !c.dashed && !e.speed0,
+    canEndTurn: true,
+    /* anything not on this list goes through one door: a check the app rolls */
+    improvise: 'anything else is [[check: DC 15 STR|DEX|CON|INT|WIS|CHA]]'
+  };
+}
+
+async function askDM(raw, opts) {
+  if (!CAMPAIGN) { openPicker(); return; }
+  /* a check-in is waiting on the table: nothing else goes to the DM until it is answered */
+  if (CHECKIN) { showCheckin(CHECKIN.info); return; }
+  if (dmBusy) { sysLine('The Dungeon Master is still thinking.'); return; }
+  dmBusy = true;
+  /* pending: never written to the save file */
+  const thinking = { who: 'sys', text: 'The Dungeon Master is thinking…', pending: true };
+  S.chat.push(thinking); drawChat();
+
+  if (raw) youHeard = raw;
+  try {
+    const r = await fetch('/api/dm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        campaign: CAMPAIGN.id,
+        say: raw,
+        phase: (opts && opts.phase) || PHASE.AWAIT,
+        legal: legalActions(),
+        outcome: (opts && opts.outcome) || [],
+        /* the DM is told the map, so its description can never drift from it */
+        terrain: terrainForDM(),
+        state: { ...S,
+          table: {
+            round: S.round,
+            order: S.order.map(o => o.k === 'pc'
+              ? { who: S.chars[o.i].name, init: o.init }
+              : { who: 'the enemy', init: o.init }),
+            upNow: S.turn === 'hero' && me() ? me().name : 'the enemy',
+            party: S.chars.map(c => ({
+              name: c.name, archetype: c.archetype, at: c.at,
+              hp: c.hp, max: c.max,
+              state: c.dead ? 'dead' : c.dying ? 'dying' : 'up',
+              dmRun: !!c.dmRun,
+              gender: c.gender || 'unstated',
+              carries: (c.kit || []).map(k => k.name).join(', ')
+            }))
+          },
+          you: {
+          speed: budget(),
+          left: Math.max(0, budget() - me().moved),
+          attacks: myAttacks().map(w => ({ name: w.n, range: w.range })),
+          abilities: myAbilities().map(k => ({
+            name: k.name, does: k.detail, range: k.range,
+            dc: k.slot === 'Healing ability' ? null : 15 + k.mod })),
+          name: me() ? me().name : null,
+          spellUses: me() ? (me().uses === undefined ? 4 : me().uses) : 4
+        } },
+        history: S.chat.filter(m => m.who !== 'sys').slice(-8)
+      })
+    });
+    const data = await r.json();
+    S.chat.splice(S.chat.indexOf(thinking), 1);
+    if (!r.ok) { sysLine(data.error || `The Dungeon Master is unreachable (${r.status}).`); return; }
+    /* the server would not spend past the line - ask the table, then send the same thing again */
+    if (data.checkin) { CHECKIN = { info: data.checkin, raw, opts }; showCheckin(data.checkin); return; }
+    narrate(data.text);
+    applyActions(data.actions);
+    if (data.spend) drawSpend(data.spend);
+    if (data.usage) {
+      document.getElementById('chatnote').textContent =
+        `${data.usage.in} in (${data.usage.cached} cached) · ${data.usage.out} out`
+        + (data.spend ? ` · $${data.spend.last.toFixed(4)}` : '');
+    }
+  } catch (err) {
+    const i = S.chat.indexOf(thinking);
+    if (i > -1) S.chat.splice(i, 1);
+    sysLine('Could not reach the Dungeon Master — check the connection.');
+  } finally {
+    dmBusy = false;
+    drawChat();
+  }
+}
+
+function sendChat() {
+  const box = document.getElementById('chatin');
+  const text = box.value.trim();
+  if (!text) return;
+  // browsing the art does not need a fight
+  if (showCommand(text)) { box.value = ''; return; }
+  if (!S) { sysLine('Start a fight first.'); box.value = ''; return; }
+  youSaid(text.replace(/</g, '&lt;'));
+  box.value = '';
+  if (showCommand(text)) return;
+  if (!runCommand(text)) askDM(text);
+}
+
+/* ---------- rendering -------------------------------------------------- */
+/* Short tag: "G2" for Goblin #2, initials for the character. At 30 columns a cell
+   is roughly 30px, so the full name lives on hover and in the side panels. */
+/* "G2" reads fine for interchangeable goblins, but a named antagonist is not a
+   G-number - the boss was showing up on the board as "G1". */
+const tagFor = (who, kind) =>
+  kind === 'foe' && /^goblin/i.test(who.name) ? 'G' + who.id : initials(who.name);
+
+function token(who, kind) {
+  const dead = who.dead && kind === 'foe';
+  const down = kind === 'hero' && (who.dying || who.dead);
+  const act = S && ((kind === 'hero' && S.turn === 'hero' && !who.dead)
+                    || (kind === 'foe' && S.turn === 'foe'));
+  const pct = Math.max(0, who.hp / who.max * 100);
+  const title = `${who.name} — ${who.at}` +
+        (dead ? ' — dead' : ` — ${Math.max(0, who.hp)}/${who.max} HP`);
+  const art = dead ? null : tokenArt(who, kind);
+  return `<div class="tok ${dead ? 'dead' : kind} ${art ? 'art' : ''} ${act && !dead ? 'act' : ''}"
+       title="${title}" ${art ? `style="background-image:url('assets/${art.thumb}')"` : ''}>
+      <div class="pic">${dead ? '†' : tagFor(who, kind)}${down ? '↓' : ''}</div>
+      ${dead ? '' : `<div class="hpbar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`}
+    </div>`;
+}
+
+/* the picture for a figure on the board, if the campaign produced one */
+function tokenArt(who, kind) {
+  if (!ART.length) return null;
+  if (who.art) return who.art;
+  if (kind === 'hero')
+    return ART.find(a => a.kind === 'player_token' && a.archetype === me().archetype)
+        || findArt(who.name, 'token');
+  return findArt(String(who.name).replace(/\s*#\s*\d+\s*$/, ''), 'token');
+}
+
+/* ---------- the art ----------------------------------------------------
+   assets/manifest.json is written by demo\publish_assets.py from whatever
+   campaign was last generated. The page degrades quietly if it is missing:
+   no strip, no spotlight, combat unaffected. */
+let ART = [];
+
+const artKey = s => String(s).replace(/#\s*\d+/g, '')
+                             .replace(/^\s*the\s+/i, '')
+                             .replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+/* The rolled party: name, archetype, and the three slots each carries.
+   Every number here came out of the PERMISSIONS matrix in the workbook, with
+   damage and range as explicit columns, so nothing is parsed from prose. */
+let PARTY = [];
+
+async function loadArt() {
+  try {
+    const r = await fetch('assets/manifest.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const doc = await r.json();
+    ART = doc.assets || [];
+    PARTY = doc.party || [];
+    window.CAMPAIGN = doc.campaign || {};
+    partyOptions();
+  } catch (e) { /* no art published yet - that is fine */ }
+  sceneOptions();
+  drawCast();
+}
+
+/* Find the one asset someone means. Tokens win over portraits for combatants,
+   because the strip is about who is on the board. */
+function findArt(query, prefer) {
+  if (!ART.length) return null;
+  const k = artKey(query);
+  if (!k) return null;
+  const pool = prefer ? [...ART].sort((a, b) =>
+        (b.kind.endsWith(prefer) ? 1 : 0) - (a.kind.endsWith(prefer) ? 1 : 0)) : ART;
+  return pool.find(a => a.key === k)
+      || pool.find(a => a.key.includes(k) || k.includes(a.key))
+      || pool.find(a => a.archetype && artKey(a.archetype) === k)
+      || null;
+}
+
+/* One entry per KIND, not per body: three goblins are one goblin thumbnail. */
+function castList() {
+  if (!S) return [];
+  const out = [];
+  for (const c of S.chars) {
+    const up = c === me() && S.turn === 'hero';
+    out.push({ cls: c === me() ? 'hero' : 'ally',
+               label: c.name,
+               sub: c.dead ? 'dead' : c.dying ? 'dying'
+                    : up ? 'their turn' : `${c.hp}/${c.max}`,
+               art: findArt(c.name, 'token')
+                    || ART.find(a => a.kind === 'player_token' && a.archetype === c.archetype) });
+  }
+
+  const seen = new Map();
+  for (const f of onBoard()) {
+    const kind = String(f.name).replace(/\s*#\s*\d+\s*$/, '').trim();
+    const e = seen.get(kind) || { cls: 'foe', label: kind, n: 0, down: 0,
+                                  art: findArt(kind, 'token') };
+    e.n++; if (f.dead) e.down++;
+    seen.set(kind, e);
+  }
+  for (const e of seen.values()) {
+    e.sub = e.n > 1 ? `${e.n - e.down} of ${e.n} standing` : (e.down ? 'down' : '');
+    out.push(e);
+  }
+  return out;
+}
+
+function drawCast() {
+  const el = document.getElementById('caststrip');
+  if (!el) return;
+  if (!ART.length) {
+    el.innerHTML = '<h2>Cast</h2><p class="castnote">No art published. '
+                 + 'Run <code>publish_assets.py</code>.</p>';
+    return;
+  }
+  const fighting = S && S.started;
+  const rows = fighting ? castList()
+    : ART.filter(a => a.kind.endsWith('portrait') || a.kind === 'battle_map')
+         .map(a => ({ cls: '', label: a.name, sub: a.kind.replace(/_/g, ' '), art: a }));
+
+  el.innerHTML = `<h2>${fighting ? 'In the fight' : 'Cast'}</h2>` + rows.map((r, i) => {
+    const src = r.art ? `assets/${r.art.thumb}` : '';
+    return `<div class="castcard ${r.cls}" data-i="${i}" title="${r.label}">
+      ${src ? `<img src="${src}" alt="${r.label}" loading="lazy">`
+            : '<img alt="" style="opacity:.25">'}
+      <div class="cap">${r.label}</div>
+      ${r.sub ? `<div class="sub">${r.sub}</div>` : ''}
+    </div>`;
+  }).join('')
+  + (fighting ? '' : '<p class="castnote">Start a fight to see who is on the board.</p>');
+
+  el.querySelectorAll('.castcard').forEach(c => c.onclick = () => {
+    const r = rows[+c.dataset.i];
+    if (r.art) openSpot(r.art);
+  });
+}
+
+function openSpot(a) {
+  const s = document.getElementById('spot');
+  s.querySelector('img').src = `assets/${a.view}`;
+  s.querySelector('.who').textContent = a.name;
+  s.querySelector('.meta').textContent =
+    a.kind.replace(/_/g, ' ') + (a.verdict ? ` · plan check: ${a.verdict}` : '');
+  s.classList.add('on');
+}
+const closeSpot = () => document.getElementById('spot').classList.remove('on');
+
+/* "show me the picture of the innkeeper" - handled here rather than by the DM,
+   because it is instant, free, and cannot be misread. */
+function showCommand(text) {
+  const m = text.match(/^\s*(?:can you\s+)?(?:show|display|pull up|bring up|look at)\b(.*)$/i);
+  if (!m) return false;
+  let q = m[1].replace(/\b(me|us|the|a|an|picture|image|portrait|art|token|map|of|for)\b/gi, ' ')
+              .replace(/[^\w\s'-]/g, ' ').trim();
+  const wantsMap = /\bmap\b/i.test(text);
+  let a = q ? findArt(q, wantsMap ? 'map' : 'portrait') : null;
+  if (!a && wantsMap) a = ART.find(x => x.kind === 'battle_map');
+  if (!a) {
+    if (!q && !wantsMap) return false;
+    sysLine(`No picture of "${q || 'that'}" — try one of: `
+            + ART.slice(0, 6).map(x => x.name).join(', ') + '…');
+    return true;
+  }
+  openSpot(a);
+  sysLine(`Showing <b>${a.name}</b>.`);
+  return true;
+}
+
+/* ---------- the rolled character ---------------------------------------
+   When a party member is chosen, their kit REPLACES the archetype card's
+   printed weapons. AC, HP, Speed and saves stay printed; the three rolled
+   slots are what they swing and what they cast. Quality moves to-hit and
+   damage together on a weapon, and the DC on an ability. */
+let WHO = null;             /* the chosen party member, or null for the demo */
+
+function partyOptions() {
+  const sel = document.getElementById('who');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">The demo character (printed kit)</option>'
+    + PARTY.map((p, i) => `<option value="${i}">${p.name} — ${p.archetype}</option>`).join('');
+  sel.disabled = !PARTY.length;
+}
+
+const dieOf = s => {
+  const m = String(s || '').match(/^(\d+)d(\d+)$/);
+  return m ? [+m[1], +m[2]] : [1, 4];
+};
+
+/* the kit's weapons, in the shape the combat engine already understands */
+function kitAttacks(p) {
+  return p.kit.filter(k => k.is_weapon).map(k => {
+    const [n, faces] = dieOf(k.damage);
+    return { n: k.name, hit: 5 + k.mod, dice: [n, faces], bonus: 3 + k.mod,
+             range: k.range, quality: k.quality, flair: k.flair };
+  });
+}
+const kitAbilities = p => p.kit.filter(k => !k.is_weapon);
+
+/* Any seat that is not yours can be run by the DM. With three friends round
+   one screen you turn this off; testing alone, you leave it on and the other
+   two still take their turns. */
+function markSeats() {
+  if (!S || !S.chars) return;
+  const on = document.getElementById('dmruns').checked;
+  // With no seat claimed, WHO is null and the old test made EVERY character
+  // DM-run, so the DM played the whole party. No claim means no DM seats.
+  for (const c of S.chars) c.dmRun = !!(on && WHO && c.name !== WHO.name);
+}
+
+function useWho() {
+  const sel = document.getElementById('who');
+  WHO = sel.value === '' ? null : PARTY[+sel.value];
+  markSeats();
+  if (!WHO) { hint('Back to the demo character.'); draw(); return; }
+  document.getElementById('pname').value = WHO.name.split(' ')[0].slice(0, 14);
+  if (ARCHETYPES[WHO.archetype]) document.getElementById('pick').value = WHO.archetype;
+  hint(`${WHO.name} — ${WHO.archetype}. Kit from the workbook, not the card.`);
+  draw();
+}
+
+/* Everything downstream asks these two, so the printed card and the rolled
+   kit can never both be live at once. */
+/* Each character swings their OWN rolled kit. Keying this off the dropdown
+   meant all three used one loadout - or, with nothing picked, the printed
+   card, which is how Hadrian fired a crossbow he does not own.
+   An empty weapon list is a real answer: the Arcanist carries nothing. */
+const myAttacks = () => {
+  const c = me();
+  if (!c) return [];
+  if (!c.kit || !c.kit.length) return ARCHETYPES[c.archetype].attacks;
+  return kitAttacks(c);
+};
+const myAbilities = () => (me() && me().kit) ? kitAbilities(me()) : [];
+
+/* Which weapon a swing would use right now. The engine used to pick silently
+   by range, so you only learned what you had swung from the log afterwards.
+   Melee first when something is adjacent, unless you have chosen otherwise by
+   clicking a weapon on the sheet. */
+function weaponNow(dist) {
+  const inReach = myAttacks().filter(x => dist === null || dist <= x.range);
+  if (!inReach.length) return null;
+  const picked = inReach.find(w => w.n === (S && S.weapon));
+  return picked || inReach.sort((x, y) =>
+    (x.range === 1 ? -1 : 1) - (y.range === 1 ? -1 : 1))[0];
+}
+
+/* the nearest living foe, which is what the button is aimed at */
+function aimDist() {
+  if (!S || !S.started) return null;
+  const ls = living();
+  return ls.length ? Math.min(...ls.map(f => cheb(me().at, f.at))) : null;
+}
+
+/* ---------- scenes: a real battle map under a real fight --------------- */
+const SCENE_STARTS = ['D9', 'C11', 'E12'];        /* the party, bottom left */
+const BOSS_START   = 'X10';                       /* the antagonist, far side */
+
+function sceneOptions() {
+  const sel = document.getElementById('scene');
+  if (!sel) return;
+  const maps = ART.filter(a => a.kind === 'battle_map' && a.terrain);
+  sel.innerHTML = '<option value="">No map — the demo\'s own terrain</option>'
+    + maps.map((a, i) => `<option value="${i}">${a.name}</option>`).join('');
+  sel.disabled = !maps.length;
+}
+
+/* Loads the map, its mask, the party and the antagonist in one go. The two
+   party members who are not you stand on the board but do not take turns yet -
+   the engine is still one hero versus foes. They are here so the scene can be
+   looked at honestly, not because multi-player combat is built. */
+function loadScene() {
+  const sel = document.getElementById('scene');
+  const maps = ART.filter(a => a.kind === 'battle_map' && a.terrain);
+  const pick = sel.value === '' ? null : maps[+sel.value];
+
+  if (!pick) { SCENE = null; draw(); hint('Back to the demo terrain.'); return; }
+  SCENE = { asset: pick, terrain: pick.terrain };
+
+  const players = ART.filter(a => a.kind === 'player_token');
+  const boss = ART.find(a => a.kind === 'boss_token');
+
+  document.getElementById('nfoes').value = '1';
+  start();                                    // rolls initiative for everyone
+
+  S.chars.forEach((c, i) => { c.at = SCENE_STARTS[i] || c.at; });
+  if (boss) {
+    S.foes[0].name = boss.name;
+    S.foes[0].at = BOSS_START;
+    S.foes[0].art = boss;
+    S.foes[0].hp = S.foes[0].max = 48;            // a boss, not a goblin
+  }
+
+  // start() announced a goblin fight; this is not that fight
+  S.log = []; S.chat = [];
+  document.getElementById('log').innerHTML = '';
+
+  draw();
+  hint(`${pick.name} — the party and ${S.foes[0].name}.`);
+  say(`<b>${pick.name}.</b> `
+    + S.chars.map(c => `${c.name.split(' ')[0]} at ${c.at}`).join(', ')
+    + `. <b>${S.foes[0].name}</b> at ${S.foes[0].at}.`);
+  say('Initiative — ' + S.order.map(o =>
+        `${o.k === 'pc' ? S.chars[o.i].name.split(' ')[0] : 'the enemy'} ${o.init}`
+      ).join(', '), 'd');
+  beginSlot(true);
+  sysLine(`Scene loaded. The grid reads this map's own mask, so the walls and `
+        + `rough ground match the picture. All three characters take their own `
+        + `turns, in the order just rolled.`);
+}
+
+function draw() {
+  let html = '<tr class="head"><th class="rowh"></th>';
+  for (let x = 0; x < COLS; x++) html += `<th>${COL_NAMES[x]}</th>`;
+  html += '</tr>';
+  for (let y = 0; y < ROWS; y++) {
+    html += `<tr><th class="rowh">${y + 1}</th>`;
+    for (let x = 0; x < COLS; x++) {
+      const s = sqName(x, y);
+      const cls = [(x + y) % 2 ? 'alt' : ''];
+      let inner = '';
+      if (isWall(s)) cls.push('wall');
+      else if (isRough(s)) cls.push('rough');
+      if (reach[s] !== undefined) { cls.push('reach'); inner += `<span class="cost">${reach[s]}</span>`; }
+      if (S) {
+        const f = foeAt(s);
+        const who = (S.chars || []).find(c => c.at === s);
+        if (who) inner += token(who, who === me() ? 'hero' : 'ally');
+        else if (f) {
+          inner += token(f, 'foe');
+          if (aiming && !f.dead && inRange(f)) cls.push('aim');
+        }
+      }
+
+      /* the cell's own slice of the battle map - see the CSS note */
+      const bg = SCENE
+        ? ` style="background-image:url('assets/${SCENE.asset.view}');background-size:${COLS * 100}% ${ROWS * 100}%;`
+          + `background-position:${(x / (COLS - 1)) * 100}% ${(y / (ROWS - 1)) * 100}%"`
+        : '';
+      html += `<td class="${cls.join(' ')}"${bg} data-sq="${s}" title="${s}">${inner}</td>`;
+    }
+    html += '</tr>';
+  }
+  const b = document.getElementById('board');
+  b.className = SCENE ? 'scene' : '';
+  b.innerHTML = html;
+  b.querySelectorAll('td').forEach(td => td.addEventListener('click', () => clickSquare(td.dataset.sq)));
+  drawHero(); drawConds(); drawAbilities(); drawEnemies(); drawSave();
+  drawHeader(); drawChat();
+  drawCast(); syncButtons();
+  queueSave();
+}
+
+function drawHeader() {
+  const rp = document.getElementById('roundpill'), tp = document.getElementById('turnpill');
+  const fp = document.getElementById('foespill');
+  rp.textContent = S && S.round ? `Round ${S.round}` : 'no fight yet';
+  if (S && S.started) {
+    tp.style.display = ''; tp.className = 'pill turn';
+    tp.textContent = S.turn === 'hero' ? `${me().name}'s turn` : "goblins' turn";
+  } else tp.style.display = 'none';
+  fp.textContent = S ? `${living().length} standing · ${S.foes.filter(f=>f.dead).length} dead · ${S.foes.filter(f=>f.gone).length} fled` : '—';
+}
+
+function drawHero() {
+  const el = document.getElementById('hero');
+  if (!S) { el.innerHTML = '<p style="color:var(--muted);margin:0;font-size:.8rem">No character yet.</p>'; return; }
+  const a = ARCHETYPES[me().archetype], h = me(), e = effects();
+  const pct = Math.max(0, h.hp / h.max * 100);
+  const notes = [];
+  if (e.youDis && !e.youAdv) notes.push('your attacks at disadvantage');
+  if (e.youAdv && !e.youDis) notes.push('your attacks at advantage');
+  if (e.themAdv) notes.push('attacks against you at advantage');
+  if (e.speed0) notes.push('Speed 0');
+  if (e.noAct) notes.push('cannot act');
+  el.innerHTML = `
+    <div class="stat"><b>${h.name}</b><span>${me().archetype}</span></div>
+    <div class="bar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>
+    <div class="stat"><span>Hit points</span><b>${h.hp} / ${h.max}</b></div>
+    <div class="stat"><span>Armour class</span><b>${a.ac}</b></div>
+    <div class="stat"><span>Square</span><b>${h.at}</b></div>
+    <div class="stat"><span>Speed</span><b>${e.speed0 ? '0 (held)' : a.speed + ' squares'}</b></div>
+    <div class="stat"><span>Movement left</span><b>${S.started && S.turn === 'hero' ? budget() - h.moved : '—'}</b></div>
+    ${h.dying ? `<div class="stat"><span>Death saves</span><b>${h.saves}✓ / ${h.fails}✗</b></div>` : ''}
+    ${h.raging ? `<div class="stat"><span>Raging</span><b>yes</b></div>` : ''}
+    ${notes.length ? `<div style="font-size:.7rem;color:var(--accent);margin-top:4px">${notes.join(' · ')}</div>` : ''}
+    ${WHO ? kitPanel() : ''}`;
+
+  el.querySelectorAll('.kit.pick').forEach(n => n.onclick = () => {
+    const w = n.dataset.weapon;
+    S.weapon = (S.weapon === w) ? null : w;   // click again to let range decide
+    sysLine(S.weapon ? `${S.weapon} in hand.` : 'Weapon chosen by reach again.');
+    draw();
+  });
+}
+
+/* The three rolled slots, exactly as the workbook has them. */
+function kitPanel() {
+  const wNow = S && S.started ? weaponNow(aimDist()) : null;
+  const row = k => {
+    const sign = k.mod > 0 ? `+${k.mod}` : k.mod;
+    const note = k.is_weapon ? `${k.damage}, ${sign} to hit and damage`
+      : k.slot === 'Healing ability' ? `${sign} to the amount healed`
+      : `DC ${15 + k.mod}`;
+    const reach = k.range > 1 ? `${k.range} squares` : 'adjacent';
+    const flair = k.is_weapon
+      ? (k.title ? `“${k.title}” — ${k.look}` : k.look || '')
+      : `${k.element || ''}, cast with ${k.delivery || ''}`;
+    const chosen = k.is_weapon && S.weapon === k.name;
+    const live = k.is_weapon && wNow && wNow.n === k.name;
+    return `<div class="kit ${k.is_weapon ? 'pick' : ''} ${chosen ? 'chosen' : ''}"
+                 ${k.is_weapon ? `data-weapon="${k.name}"` : ''}>
+      <div class="kitname">${k.name}${live ? '<span class="inhand">in hand</span>' : ''}<span class="q ${k.quality.toLowerCase()}">${k.quality}</span></div>
+      <div class="kitline">${note} · ${reach}</div>
+      <div class="kitdet">${k.detail}</div>
+      ${flair.trim() ? `<div class="kitflair">${flair}</div>` : ''}
+    </div>`;
+  };
+  return `<div class="stat" style="margin-top:8px"><b>Carrying</b>
+            <span>${me().uses} Spell Uses left</span></div>`
+       + WHO.kit.map(row).join('')
+       + (myAttacks().length > 1
+          ? '<div class="kitflair" style="margin-top:5px">Click a weapon to keep it in hand.</div>'
+          : '');
+}
+
+/* One button per rolled ability. Each spends a Spell Use; weapons cost
+   nothing. The engine applies the effect it can (healing) and states the DC
+   for the ones the table adjudicates, rather than inventing a resolution. */
+function drawAbilities() {
+  const el = document.getElementById('abilities');
+  if (!el) return;
+  const list = myAbilities();
+  if (!S || !list.length) { el.innerHTML = ''; return; }
+  if (me().uses === undefined) me().uses = 4;
+  el.innerHTML = list.map((k, i) =>
+    `<button data-ab="${i}" ${me().uses <= 0 || S.acted || S.turn !== 'hero' || !S.started
+      ? 'disabled' : ''} title="${k.detail}">${k.name}</button>`).join('')
+    + `<span style="font-size:.7rem;color:var(--muted)">${me().uses} Spell Uses</span>`;
+  el.querySelectorAll('button').forEach(b =>
+    b.onclick = () => useAbility(list[+b.dataset.ab]));
+}
+
+/* Which enemy an ability lands on: the one named, else the nearest in range. */
+function abilityTarget(k, named) {
+  const pool = living().filter(f => cheb(me().at, f.at) <= k.range);
+  if (!pool.length) return null;
+  if (named) {
+    const hit = pool.find(f => f.name.toLowerCase().includes(String(named).toLowerCase()));
+    if (hit) return hit;
+  }
+  return pool.sort((a, b) => cheb(me().at, a.at) - cheb(me().at, b.at))[0];
+}
+
+/* The condition an effect leaves behind, if the engine can model it. */
+const EFFECT_COND = {
+  Hold: 'stunned', Entangle: 'restrained', Web: 'restrained',
+  Slow: 'slowed', Knockdown: 'prone', Grease: 'prone',
+  Dread: 'frightened', 'Blinding Flash': 'blinded', Charm: 'charmed',
+  Mark: 'marked', Disarm: 'disarmed', Command: 'commanded',
+  Dazzle: 'dazzled', Fog: 'blinded', Silence: 'silenced',
+};
+
+function useAbility(k, named) {
+  if (!S || !S.started || S.turn !== 'hero') { sysLine('Not your turn.'); return; }
+  if (S.acted) { sysLine(`${me().name} has already acted this turn.`); return; }
+  if (me().uses <= 0) { sysLine('No Spell Uses left — Catch Your Breath to refresh.'); return; }
+
+  const dc = 15 + k.mod;
+  const sign = k.mod > 0 ? `+${k.mod}` : k.mod;
+  const dice = (String(k.damage).match(/^(\d+)d(\d+)$/) || [0, 0, 0]).slice(1).map(Number);
+  const roll = (n, faces) => n ? Array.from({ length: n }, () => d(faces))
+                                      .reduce((a, b) => a + b, 0) : 0;
+
+  if (k.slot === 'Healing ability') {
+    me().uses -= 1;
+    const heal = roll(dice[0], dice[1]) + 3 + k.mod;
+    me().hp = Math.min(me().max, me().hp + heal);
+    say(`<b>${k.name}</b> (${k.quality}, ${sign}) — heals <b>${heal}</b>. ` +
+        `${me().name} is on ${me().hp}/${me().max}.`, 'd');
+    record(`${me().name} used ${k.name} and healed ${heal}; now on ${me().hp} of ${me().max}.`);
+
+  } else {
+    /* Everything below used to print the DC and stop, so Kestrel cast
+       Crushing Word three times and never dealt a point of damage. The app is
+       the table: it rolls the save and applies the result. */
+    const t = abilityTarget(k, named);
+    if (!t) {
+      sysLine(`Nothing is within ${k.range} square${k.range === 1 ? '' : 's'} for ${k.name}.`);
+      return;
+    }
+    me().uses -= 1;
+    const sv = d(20) + 2;                       /* monsters save at a flat +2 */
+    const made = sv >= dc;
+
+    if (dice[0]) {
+      let dmg = roll(dice[0], dice[1]);
+      if (made) dmg = Math.floor(dmg / 2);
+      t.hp -= dmg;
+      say(`<b>${k.name}</b> (${k.quality}) at ${t.name} — save ${sv} vs DC ${dc}: ` +
+          `${made ? 'made it, half' : '<span class="hit">failed</span>'}. ` +
+          `<span class="hit">${dmg} damage</span>.`, '');
+      record(`${me().name} used ${k.name} on ${t.name}. It ${made ? 'partly resisted' : 'failed to resist'} `
+           + `and took ${dmg}.`);
+      if (t.hp <= 0) {
+        t.hp = 0; t.dead = true;
+        say(`<b>${t.name} drops.</b>`, 'crit');
+        record(`${t.name} is down.`);
+      }
+    } else {
+      const cond = EFFECT_COND[k.name];
+      if (made) {
+        say(`<b>${k.name}</b> at ${t.name} — save ${sv} vs DC ${dc}: ` +
+            `<span class="miss">it shrugs it off.</span>`, 'miss');
+        record(`${me().name} used ${k.name} on ${t.name}; it saved and nothing took hold.`);
+      } else {
+        t.cond = t.cond || {};
+        if (cond) t.cond[cond] = 1;             /* one round */
+        say(`<b>${k.name}</b> at ${t.name} — save ${sv} vs DC ${dc}: ` +
+            `<span class="hit">it fails.</span> ${k.detail}`, '');
+        record(`${me().name} used ${k.name} on ${t.name}; it failed the save and is ${cond || 'affected'}.`);
+      }
+    }
+    checkFoes();
+  }
+
+  sysLine(`${me().uses} Spell Uses left.`);
+  S.acted = true;
+  draw();
+  narrateOutcome(PHASE.RESOLVED);
+}
+
+function drawConds() {
+  document.getElementById('conds').innerHTML = Object.keys(CONDITIONS).map(c =>
+    `<span class="cond ${has(c) ? 'on' : ''}" data-cond="${c}">${c}</span>`).join('');
+  document.getElementById('conds').querySelectorAll('.cond').forEach(el =>
+    el.addEventListener('click', () => toggleCond(el.dataset.cond)));
+
+  const sit = document.getElementById('sit');
+  sit.innerHTML = ['advantage','disadvantage'].map(k =>
+    `<span class="cond ${S && me().sit && me().sit[k] ? 'on' : ''}" data-sit="${k}">${k}</span>`).join('');
+  sit.querySelectorAll('.cond').forEach(el =>
+    el.addEventListener('click', () => toggleSit(el.dataset.sit)));
+}
+
+function toggleSit(k) {
+  if (!S) return;
+  if (!me().sit) me().sit = {};
+  me().sit[k] = !me().sit[k];
+  draw();
+}
+
+function toggleCond(c) {
+  if (!S) return;
+  me().cond[c] = !me().cond[c];
+  say(`${me().name} is ${me().cond[c] ? 'now' : 'no longer'} <b>${c}</b>.`, 'd');
+  draw();
+}
+
+function drawEnemies() {
+  const el = document.getElementById('enemies');
+  if (!S) { el.innerHTML = '<p style="color:var(--muted);margin:0;font-size:.8rem">None.</p>'; return; }
+  el.innerHTML = S.foes.map(f => {
+    const out = f.dead || f.gone;
+    const pct = Math.max(0, f.hp / f.max * 100);
+    return `<div class="enemy ${out ? 'out' : ''}">
+      <div class="pic">${initials(f.name)}</div>
+      <div class="en">
+        <div class="nm" style="color:${out ? 'var(--dead)' : 'var(--foe)'}">${f.name}</div>
+        ${out ? '' : `<div class="hpbar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`}
+      </div>
+      <div class="sq">${f.gone ? 'fled' : f.dead ? 'dead' : `${f.at} · ${f.hp}/${f.max}`}</div>
+    </div>`;
+  }).join('');
+}
+
+function drawSave() {
+  const el = document.getElementById('saveline');
+  if (!S || !S.started) { el.textContent = '—'; return; }
+  const parts = [`${me().name} ${me().at} (${me().hp} hp)`];
+  for (const f of S.foes)
+    parts.push(`${f.name} ${f.gone ? 'fled' : f.dead ? 'dead' : `${f.at} (${f.hp} hp)`}`);
+  el.textContent = parts.join(', ') +
+    ` — round ${S.round}, ${S.turn === 'hero' ? me().name + "'s" : "goblins'"} turn`;
+}
+
+const budget = () => effects().speed0 ? 0 : ARCHETYPES[me().archetype].speed * (me().dashed ? 2 : 1);
+const inRange = f => {
+  const dist = cheb(me().at, f.at);
+  return myAttacks().some(w => dist <= w.range);
+};
+function hint(t) { document.getElementById('hint').textContent = t; }
+
+function syncButtons() {
+  const e = effects();
+  const on = S && S.started && S.turn === 'hero' && !me().dying && living().length > 0 && !e.noAct;
+  const a = S ? ARCHETYPES[me().archetype] : null;
+  document.getElementById('bMove').disabled    = !on || me().moved >= budget();
+  const ab = document.getElementById('bAttack');
+  ab.disabled = !on || S.acted;
+  const w = S && S.started ? weaponNow(aimDist()) : null;
+  ab.textContent = w ? `Attack — ${w.n}` : 'Attack';
+  ab.title = w ? `${w.n}: +${w.hit} to hit, ${w.dice[0]}d${w.dice[1]}+${w.bonus}, `
+               + `reach ${w.range} square${w.range === 1 ? '' : 's'}`
+               : 'Nothing in reach';
+  document.getElementById('bDash').disabled    = !on || S.acted || me().dashed || e.speed0;
+  document.getElementById('bSpecial').disabled = !on || !a || me().usedSpecial ||
+        !['Second Wind','Rage','Divine Smite'].includes(a.special);
+  document.getElementById('bEnd').disabled     = !(S && S.started &&
+        (S.turn === 'hero'));
+  if (a) document.getElementById('bSpecial').textContent = a.special;
+}
+
+/* ---------- clicks ----------------------------------------------------- */
+function clickSquare(sq) {
+  if (!S || !S.started) return;
+  if (aiming) {
+    const f = foeAt(sq);
+    if (f && !f.dead && inRange(f)) { aiming = false; doAttack(f); }
+    return;
+  }
+  if (S.mode === 'move' && reach[sq] !== undefined) moveTo(sq);
+}
+
+/* ---------- turn flow -------------------------------------------------- */
+function start() {
+  const name = document.getElementById('pname').value.trim();
+  const n = parseInt(document.getElementById('nfoes').value, 10);
+  S = freshState(name, document.getElementById('pick').value, n);
+  S.started = true; S.round = 1; S.log = [];
+  markSeats();
+
+  /* Initiative: every character rolls, the monsters roll ONCE between them,
+     per the rules. The order is then fixed for the fight and the app keeps
+     it, so nobody has to remember whose go it is. */
+  const rolls = S.chars.map((c, i) => ({
+    k: 'pc', i, init: d(20) + (ARCHETYPES[c.archetype] || ARCHETYPES.Vanguard).dex }));
+  const foeInit = d(20) + 2;
+  S.order = [...rolls, { k: 'foes', init: foeInit }]
+              .sort((a, b) => b.init - a.init || (a.k === 'pc' ? -1 : 1));
+  S.slot = 0;
+
+  say(`<b>${n === 1 ? 'A goblin' : n + ' goblins'}</b> at ${S.foes.map(f => f.at).join(', ')}.`);
+  say('Initiative — ' + S.order.map(o =>
+        `${o.k === 'pc' ? S.chars[o.i].name : 'the enemy'} ${o.init}`).join(', ')
+      + '. One roll for all the monsters.', 'd');
+  reach = {}; aiming = false;
+  beginSlot(true);
+}
+
+/* ---------- the round --------------------------------------------------
+   One place decides whose turn it is. Everything else reads it. */
+function beginSlot(first) {
+  const o = S.order[S.slot];
+  if (o.k === 'foes') {
+    S.turn = 'foe';
+    reach = {}; aiming = false; S.mode = null;
+    draw(); hint('The enemy is moving…');
+    setTimeout(foeTurn, first ? 700 : 450);
+    return;
+  }
+  S.active = o.i;
+  const c = me();
+  S.turn = 'hero';
+  c.moved = 0; c.dashed = false; S.acted = false;
+  reach = {}; aiming = false; S.mode = null;
+
+  if (c.dead) { endTurn(); return; }
+  if (c.dying) { draw(); deathSave(); return; }
+
+  if (effects().noAct) {
+    say(`${c.name} cannot act this turn.`, 'd');
+    draw(); setTimeout(endTurn, 700); return;
+  }
+  draw();
+  hint(`${c.name}'s turn — say what they do.`);
+  if (c.dmRun) { setTimeout(() => askDM('', { phase: PHASE.AWAIT }), 500); return; }
+  /* Julian's rule: the DM opens a turn with this one line and offers nothing
+     else unless a player asks. Written here rather than asked of the model, so
+     it is guaranteed, instant and free. */
+  const given = c.name.split(' ')[0];
+  narrate(`It's ${c.name}'s turn. What does ${given} do?`);
+}
+
+function nextSlot() {
+  S.slot += 1;
+  if (S.slot >= S.order.length) {
+    S.slot = 0;
+    S.round += 1;
+    say(`— round ${S.round} —`, 'd');
+  }
+  beginSlot(false);
+}
+
+function showMoves() {
+  reach = reachable(me().at, budget() - me().moved, living().map(f => f.at));
+  S.mode = 'move'; aiming = false;
+  draw();
+  hint('Click a green square. The small number is what it costs to get there.');
+}
+
+function moveTo(sq) {
+  const spent = reach[sq], from = me().at;
+  me().moved += spent; me().at = sq;
+  reach = {}; S.mode = null;
+  say(`${me().name} moves ${from} → <b>${sq}</b> (${spent} ${spent === 1 ? 'square' : 'squares'}, ${budget() - me().moved} left).`, 'd');
+  draw();
+  hint('Moved. Attack, or end the turn.');
+}
+
+function attack() {
+  const targets = living().filter(inRange);
+  if (!targets.length) {
+    const near = living().reduce((m, f) => Math.min(m, cheb(me().at, f.at)), 99);
+    say(`Nothing in reach — ${nearestFoeName()} is ${near} squares away.`, 'miss');
+    if (!myAttacks().length && myAbilities().length)
+      sysLine(`${me().name} carries no weapon — `
+            + myAbilities().map(k => k.name).join(', ') + ' is what they have.');
+    hint('Out of reach. Move closer first.');
+    return;
+  }
+  if (targets.length === 1) { doAttack(targets[0]); return; }
+  aiming = true; reach = {}; S.mode = null;
+  draw();
+  hint('Click the goblin you want to attack.');
+}
+
+function doAttack(target) {
+  if (S.acted) { sysLine(`${me().name} has already acted this turn.`); return; }
+  const a = ARCHETYPES[me().archetype];
+  const dist = cheb(me().at, target.at);
+  const w = weaponNow(dist);
+  S.acted = true; aiming = false;
+  const swings = (a.extraAttack || (a.twoWeapon && w.range === 1)) ? 2 : 1;
+  for (let i = 0; i < swings && !target.dead; i++) swing(w, target, i + 1, swings);
+  checkFoes();
+  narrateOutcome(PHASE.RESOLVED);
+  draw();
+  hint(target.dead ? `${target.name} is down.` : 'Attack made. End the turn when ready.');
+}
+
+function swing(w, target, n, of) {
+  const e = effects();
+  const adv = e.youAdv && !e.youDis;
+  const dis = e.youDis && !e.youAdv;
+  const a = ARCHETYPES[me().archetype];
+  const label = of > 1 ? `${w.n} (${n} of ${of})` : w.n;
+  const cover = hasCover(me().at, target.at);
+  const ac = GOBLIN.ac + (cover ? 2 : 0);
+
+  if (w.save) {                       /* Vicious Mockery — a save, not an attack roll */
+    const sv = d(20) + 2;
+    if (sv >= w.save) { say(`<b>${label}</b> at ${target.name} — it saves (${sv} vs DC ${w.save}). No effect.`, 'miss'); return; }
+    const dmg = rollDice(w.dice);
+    target.hp -= dmg;
+    say(`<b>${label}</b> at ${target.name} — it fails (${sv} vs DC ${w.save}). <span class="hit">${dmg} psychic.</span>`, '');
+    return;
+  }
+
+  const { roll, note } = d20(adv, dis);
+  const total = roll + w.hit;
+  if (roll === 1) {
+    say(`<b>${label}</b> at ${target.name} — natural 1. Always a miss.`, 'miss');
+    record(`${me().name} swung ${w.n} at ${target.name} and fumbled it completely.`);
+    return;
+  }
+  const crit = roll === 20;
+  if (!crit && total < ac) {
+    say(`<b>${label}</b> at ${target.name} — ${total}${note} vs AC ${ac}${cover ? ' (half cover, +2)' : ''}. <span class="miss">Miss.</span>`, '');
+    record(`${me().name} attacked ${target.name} with ${w.n} and missed`
+         + `${cover ? ', the cover saved it' : ''}.`);
+    return;
+  }
+  let dmg = crit ? rollDice(w.dice) + rollDice(w.dice) + w.bonus : rollDice(w.dice) + w.bonus;
+  let extra = '';
+  if (a.sneak && adv) { const sa = rollDice([2,6]); dmg += sa; extra += ` +${sa} sneak attack`; }
+  if (me().raging && w.range === 1) { dmg += 2; extra += ' +2 rage'; }
+  if (me().smiting) { const sm = rollDice([2,8]); dmg += sm; extra += ` +${sm} divine smite`; me().smiting = false; }
+  target.hp -= dmg;
+  say(`<b>${label}</b> at ${target.name} — ${crit ? '<span class="crit">natural 20!</span>' : `${total}${note} vs AC ${ac}`}. ` +
+      `<span class="hit">${dmg} damage</span>${extra}.`, '');
+  record(`${me().name} hit ${target.name} with ${w.n} for ${dmg}`
+       + `${crit ? ' on a critical' : ''}${extra ? ' (' + extra.trim() + ')' : ''}.`);
+  if (target.hp <= 0) {
+    target.hp = 0; target.dead = true;
+    record(`${target.name} is down.`);
+    say(`<b>${target.name} drops.</b>`, 'crit');
+    narrate(`${target.name} folds and does not get up.`);
+  }
+}
+
+function checkFoes() {
+  for (const f of living()) {
+    if (f.hp <= 2 && !f.fleeing) {
+      f.fleeing = true;
+      say(`${f.name} is badly hurt. <b>It wants to run.</b>`, 'd');
+    }
+  }
+  if (!living().length) endFight();
+}
+
+function dash() {
+  me().dashed = true; S.acted = true;
+  say(`${me().name} Dashes — ${ARCHETYPES[me().archetype].speed * 2} squares this turn.`, 'd');
+  draw(); hint('Dashed. Movement doubled for this turn.');
+}
+
+function special() {
+  const a = ARCHETYPES[me().archetype];
+  me().usedSpecial = true;
+  if (a.special === 'Second Wind') {
+    const heal = rollDice([1,10]) + 3;
+    me().hp = Math.min(me().max, me().hp + heal);
+    say(`<b>Second Wind</b> — ${me().name} recovers ${heal}, now ${me().hp}/${me().max}. Costs no action.`, '');
+  } else if (a.special === 'Rage') {
+    me().raging = true;
+    say(`<b>Rage.</b> +2 damage in melee, and every weapon attack against ${me().name} deals half.`, '');
+  } else if (a.special === 'Divine Smite') {
+    me().smiting = true;
+    say(`<b>Divine Smite</b> readied — the next hit adds 2d8 radiant.`, '');
+  }
+  draw();
+}
+
+function endTurn() {
+  if (me().dying && !me().dead) { deathSave(); return; }
+  nextSlot();
+}
+
+/* ---------- the goblins (one shared initiative) ------------------------ */
+function foeTurn() {
+  if (!S || !S.started) return;
+  for (const f of living()) {
+    /* A monster goes for whoever is nearest, not for whoever happens to be
+       holding the spotlight. With three characters on the board that is the
+       difference between a fight and a queue. */
+    const mark = nearestChar(f.at);
+    if (!mark) break;
+    /* conditions the party put on it actually bite, then wear off */
+    f.cond = f.cond || {};
+    if (f.cond.stunned) {
+      say(`${f.name} is held fast and loses the turn.`, 'd');
+      record(`${f.name} was held and could not act.`);
+      f.cond = {}; continue;
+    }
+    const held = !!(f.cond.restrained || f.cond.prone);
+    const shaken = !!f.cond.frightened;
+    f.cond = {};
+    const e = effects(mark);
+    if (f.hp <= 2 && !f.fleeing) {
+      f.fleeing = true;
+      say(`${f.name} has had enough. <b>It wants out.</b>`, 'd');
+    }
+    const blocked = onBoard().filter(o => o !== f && !o.dead).map(o => o.at)
+                  .concat(standing().map(c => c.at));
+    const dist = cheb(f.at, mark.at);
+
+    if (f.fleeing) {
+      const opts = reachable(f.at, GOBLIN.speed, blocked);
+      let best = f.at, bestD = dist;
+      for (const sq in opts) { const dd = cheb(sq, mark.at); if (dd > bestD) { bestD = dd; best = sq; } }
+      if (best !== f.at) { say(`${f.name} breaks off — ${f.at} → <b>${best}</b>. Nimble Escape.`, 'd'); f.at = best; }
+      const [fx, fy] = toXY(best);
+      const atEdge = fx === 0 || fy === 0 || fx === COLS - 1 || fy === ROWS - 1;
+      if (bestD >= 8 || (atEdge && bestD >= 4)) { f.gone = true; say(`${f.name} reaches the dark and is gone.`, 'd'); }
+      continue;
+    }
+
+    if (dist > 1 && !held && !shaken) {
+      const opts = reachable(f.at, GOBLIN.speed, blocked);
+      let best = f.at, bestD = dist;
+      for (const sq in opts) { const dd = cheb(sq, mark.at); if (dd < bestD) { bestD = dd; best = sq; } }
+      if (best !== f.at) { say(`${f.name} comes ${f.at} → <b>${best}</b>.`, 'd'); f.at = best; }
+    }
+
+    if (cheb(f.at, mark.at) <= 1 && !mark.dying) {
+      const a = ARCHETYPES[mark.archetype];
+      const cover = hasCover(f.at, mark.at);
+      const ac = a.ac + (cover ? 2 : 0);
+      const fAdv = e.themAdv && !e.themDis, fDis = e.themDis && !e.themAdv;
+      const { roll, note } = d20(fAdv, fDis);
+      const total = roll + GOBLIN.hit;
+      if (roll === 1) say(`${f.name} swings — natural 1. Miss.`, 'miss');
+      else if (roll !== 20 && total < ac) {
+        say(`${f.name} swings — ${total}${note} vs AC ${ac}. <span class="miss">Miss.</span>`, '');
+        record(`${f.name} swung at ${mark.name} and missed.`);
+      }
+      else {
+        let dmg = roll === 20 ? rollDice(GOBLIN.dice) + rollDice(GOBLIN.dice) + GOBLIN.bonus
+                              : rollDice(GOBLIN.dice) + GOBLIN.bonus;
+        let tail = '';
+        if (mark.raging) { dmg = Math.floor(dmg / 2); tail = ' (halved by Rage)'; }
+        mark.hp -= dmg;
+        say(`${f.name} — ${roll === 20 ? '<span class="crit">natural 20!</span>' : `${total}${note} vs AC ${ac}`}. ` +
+            `<span class="hit">${dmg} damage</span>${tail}. ${mark.name} is on ${Math.max(0, mark.hp)}.`, '');
+        record(`${f.name} hit ${mark.name} for ${dmg}${roll === 20 ? ' on a critical' : ''}. `
+             + `${mark.name} is on ${Math.max(0, mark.hp)} of ${mark.max}.`);
+        if (mark.hp <= 0) {
+          mark.hp = 0; mark.dying = true;
+          say(`<b>${mark.name} drops to 0 and is dying.</b>`, 'crit');
+          if (partyDown()) { endFight(true); return; }
+          narrate(`${mark.name} goes down. Roll a death save at the start of each turn.`);
+        }
+      }
+    }
+  }
+  if (!living().length) { endFight(); return; }
+  narrateOutcome(PHASE.ENEMY);
+  nextSlot();
+}
+
+function deathSave() {
+  const r = d(20);
+  if (r === 20) {
+    me().dying = false; me().hp = 1; me().saves = me().fails = 0;
+    say(`Death save: <b>natural 20</b> — ${me().name} comes round at 1 hit point.`, 'crit');
+    draw(); hint('Back up, on 1 hit point.'); return;
+  }
+  if (r === 1) { me().fails += 2; say(`Death save: <b>natural 1</b> — two failures. ${me().fails}✗`, 'crit'); }
+  else if (r >= 10) { me().saves++; say(`Death save: ${r} — a success. ${me().saves}✓`, ''); }
+  else { me().fails++; say(`Death save: ${r} — a failure. ${me().fails}✗`, ''); }
+
+  if (me().fails >= 3) {
+    me().dead = true; me().dying = false;
+    say(`<b>Three failures. ${me().name} dies.</b> Death still requires the dice to really insist.`, 'crit');
+    draw();
+    if (partyDown()) { endFight(true); return; }
+    setTimeout(nextSlot, 900); return;
+  }
+  if (me().saves >= 3) { me().dying = false; say(`Three successes — stable, unconscious but no longer dying.`, ''); }
+  draw();
+  // the spotlight moves to the next in the order, not straight to the monsters
+  setTimeout(nextSlot, 700);
+}
+
+/* everyone dead or on the floor - the only way the party loses */
+const partyDown = () => S.chars.every(c => c.dead || c.dying);
+
+function endFight(lost) {
+  S.started = false;
+  reach = {}; aiming = false;
+  if (lost) {
+    say(`<b>The party is down.</b>`, 'crit');
+    narrate('The last of you goes down, and the noise stops. Whatever happens ' +
+            'next is not up to any of you.');
+    draw(); hint('The party fell. Start another fight.');
+    return;
+  }
+  const ran = S.foes.filter(f => f.gone).length, killed = S.foes.filter(f => f.dead).length;
+  say(`<b>The fight is over.</b> ${killed} down${ran ? `, ${ran} ran` : ''}.`, 'crit');
+  // house rule: the fight ending brings everyone still breathing back up
+  for (const c of S.chars) {
+    if (c.dead) continue;
+    if (c.dying || c.hp <= 0) {
+      c.dying = false; c.hp = 1; c.saves = c.fails = 0;
+      say(`House rule: the fight has ended, so ${c.name} wakes at <b>1 hit point</b>.`, '');
+    }
+  }
+  narrate(`It is over. ${killed} dead${ran ? `, ${ran} gone into the dark` : ''}. The room goes quiet.`);
+  draw(); hint('Fight over. Start another whenever you like.');
+}
+
+/* ---------- campaigns, save and resume -----------------------------------
+   Every game belongs to a campaign, and the campaign's save file lives in
+   Supabase, written by /api/save. The page autosaves a moment after anything
+   changes, so closing the browser mid-fight loses nothing. Browser storage
+   only remembers WHICH campaign was open, as a convenience. */
+let CAMPAIGN = null;          /* { id, name } */
+let CHECKIN = null;           /* { info, raw, opts } while the table is being asked */
+let lastSaved = '';
+let saveTimer = null;
+const REMEMBER = 'hearthlight-campaign';
+
+const snapshot = () => JSON.stringify({ ...S, chat: S.chat.filter(m => !m.pending) });
+
+function queueSave() {
+  if (!S || !CAMPAIGN) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => save(false), 1200);
+}
+
+async function save(loud) {
+  if (!S || !CAMPAIGN) { if (loud) hint('Nothing to save yet.'); return; }
+  const body = snapshot();
+  if (body === lastSaved && !loud) return;
+  try {
+    const r = await fetch('/api/save', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: `{"campaign":${CAMPAIGN.id},"scene":${JSON.stringify(SCENE ? SCENE.asset.name : null)},"state":${body}}`
+    });
+    if (!r.ok) throw new Error(r.status);
+    lastSaved = body;
+    if (loud) say('Saved.', 'd');
+  } catch (err) {
+    /* say it plainly: an unsaved game is worth knowing about */
+    say(`Could not save (${err.message}). The game is still running; it will try again.`, 'd');
+  }
+}
+
+async function load() {
+  if (!CAMPAIGN) { openPicker(); return; }
+  try {
+    await ART_READY;
+    const r = await fetch(`/api/save?campaign=${CAMPAIGN.id}`, { cache: 'no-store' });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.status);
+    if (!data.state) { S = null; draw(); hint(`${CAMPAIGN.name}: nothing played yet. Start a fight.`); return; }
+    S = data.state; reach = {}; aiming = false;
+    for (const c of S.chars) { c.cond = c.cond || {}; c.sit = c.sit || {}; }
+    if (!S.chat) S.chat = [];
+    if (!S.log) S.log = [];
+    const asset = data.scene && ART.find(a => a.kind === 'battle_map' && a.name === data.scene);
+    SCENE = asset ? { asset, terrain: asset.terrain } : null;
+    lastSaved = snapshot();
+    drawLog(); draw();
+    say(`Resumed — round ${S.round}.`, 'd');
+    hint(`${CAMPAIGN.name}: resumed exactly where it stopped.`);
+    /* the monsters' turn was a timer when the page closed; start it again */
+    if (S.started && S.turn === 'foe') setTimeout(foeTurn, 700);
+  } catch (err) { hint(`Could not read the save (${err.message}).`); }
+}
+
+/* ---------- the spend meter -------------------------------------------- */
+function drawSpend(m) {
+  const el = document.getElementById('spendpill');
+  el.textContent = `$${m.spent.toFixed(2)} of $${m.nextCheckin}`;
+  el.className = 'pill' + (m.spent >= m.nextCheckin - 0.5 ? ' warn' : '');
+}
+async function refreshSpend() {
+  if (!CAMPAIGN) return;
+  try {
+    const r = await fetch(`/api/spend?campaign=${CAMPAIGN.id}&stage=play`, { cache: 'no-store' });
+    if (r.ok) drawSpend(await r.json());
+  } catch (err) { /* the pill just stays as it was */ }
+}
+
+function showCheckin(c) {
+  document.getElementById('checkintext').innerHTML =
+    `<b>We've spent $${c.spent.toFixed(2)} of the $${c.limit} for this campaign.</b> `
+    + `Keep playing? The next check-in is at $${c.after}.`;
+  document.getElementById('checkin').className = 'checkin on';
+  hint('Waiting on the table: keep playing?');
+}
+function hideCheckin() { document.getElementById('checkin').className = 'checkin'; }
+
+async function keepGoing() {
+  if (!CHECKIN) return hideCheckin();
+  const btn = document.getElementById('bKeepGoing');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/spend', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ campaign: CAMPAIGN.id, stage: CHECKIN.info.stage })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.status);
+    const { raw, opts } = CHECKIN;
+    CHECKIN = null; hideCheckin();
+    sysLine(`Carrying on. The next check-in is at $${data.nextCheckin}.`);
+    refreshSpend();
+    askDM(raw, opts);                        // the turn that was waiting
+  } catch (err) {
+    sysLine(`Could not reach the spend meter (${err.message}). Try again.`);
+  } finally { btn.disabled = false; }
+}
+function stopHere() {
+  CHECKIN = null; hideCheckin();
+  sysLine('Stopped at the spending check-in. The game is saved; pick it up whenever you like.');
+  save(false);
+}
+
+/* ---------- the campaign picker ---------------------------------------- */
+async function openPicker() {
+  document.getElementById('picker').className = 'picker on';
+  const list = document.getElementById('pickerlist');
+  try {
+    const r = await fetch('/api/campaign', { cache: 'no-store' });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.status);
+    list.innerHTML = data.campaigns.length
+      ? data.campaigns.map(c => `<button class="camp" data-id="${c.id}">`
+          + `<span>${esc(c.name)}</span><span class="muted">${c.last_played || 'not played yet'}</span></button>`).join('')
+      : '<p class="muted">No campaigns yet.</p>';
+    list.querySelectorAll('.camp').forEach(b => b.onclick = () => {
+      const c = data.campaigns.find(x => String(x.id) === b.dataset.id);
+      useCampaign({ id: c.id, name: c.name });
+    });
+  } catch (err) {
+    list.innerHTML = `<p class="muted">Could not reach the campaign records (${esc(err.message)}).</p>`;
+  }
+}
+
+async function newCampaign() {
+  const box = document.getElementById('newcampaign');
+  const name = box.value.trim();
+  if (!name) { box.focus(); return; }
+  try {
+    const r = await fetch('/api/campaign', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.status);
+    box.value = '';
+    useCampaign(data);
+  } catch (err) {
+    document.getElementById('pickernote').textContent = `Could not start it (${err.message}).`;
+  }
+}
+
+function useCampaign(c) {
+  /* leaving a game: write it down before switching */
+  if (S && CAMPAIGN && CAMPAIGN.id !== c.id) save(false);
+  CAMPAIGN = c; CHECKIN = null; hideCheckin();
+  try { localStorage.setItem(REMEMBER, JSON.stringify(c)); } catch (err) { /* convenience only */ }
+  document.getElementById('picker').className = 'picker';
+  document.getElementById('campaignpill').textContent = c.name;
+  S = null; SCENE = null; lastSaved = '';
+  document.getElementById('log').innerHTML = '';
+  refreshSpend();
+  load();
+}
+
+const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+
+/* ---------- wiring ----------------------------------------------------- */
+document.getElementById('pick').innerHTML = Object.keys(ARCHETYPES).map(k => {
+  const a = ARCHETYPES[k];
+  return `<option value="${k}">${k} — AC ${a.ac}, ${a.hp} hp, ${a.speed} sq</option>`;
+}).join('');
+
+document.getElementById('bStart').onclick   = start;
+document.getElementById('bReset').onclick   = () => { S = null; reach = {}; aiming = false;
+  SCENE = null; document.getElementById('scene').value = '';
+  document.getElementById('log').innerHTML = ''; draw(); hint('Pick an archetype below and start a fight.'); };
+document.getElementById('bMove').onclick    = showMoves;
+document.getElementById('bAttack').onclick  = attack;
+document.getElementById('bDash').onclick    = dash;
+document.getElementById('bSpecial').onclick = special;
+document.getElementById('bEnd').onclick     = endTurn;
+document.getElementById('bSend').onclick     = sendChat;
+document.getElementById('chatin').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendChat(); }
+});
+document.getElementById('bSave').onclick    = () => save(true);
+document.getElementById('bLoad').onclick    = load;
+document.getElementById('bKeepGoing').onclick   = keepGoing;
+document.getElementById('bStopHere').onclick    = stopHere;
+document.getElementById('campaignpill').onclick = openPicker;
+document.getElementById('bNewCampaign').onclick = newCampaign;
+document.getElementById('newcampaign').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') newCampaign();
+});
+document.getElementById('bScene').onclick   = loadScene;
+document.getElementById('who').onchange     = useWho;
+document.getElementById('dmruns').onchange  = () => { markSeats(); draw(); };
+
+/* spotlight: click anywhere off the picture, or press Escape, to dismiss */
+document.getElementById('spot').addEventListener('click', ev => {
+  if (ev.target.tagName !== 'IMG') closeSpot();
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') closeSpot();
+});
+
+draw();
+const ART_READY = loadArt();
+/* reopen the campaign this screen last had open, or ask which one */
+(function () {
+  let c = null;
+  try { c = JSON.parse(localStorage.getItem(REMEMBER) || 'null'); } catch (err) { c = null; }
+  if (c && c.id) useCampaign(c); else openPicker();
+})();
+</script>
+</body>
+</html>

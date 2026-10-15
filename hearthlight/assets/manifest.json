@@ -1,0 +1,449 @@
+{
+ "campaign": {
+  "The job": "Take custody of a prisoner and ask nothing",
+  "Setting": "Prisoner_Gaol",
+  "BOSS": "the Evil Eel Keeper - wants to protect something it will not name"
+ },
+ "party": [
+  {
+   "name": "Kestrel Silverleaf",
+   "archetype": "Arcanist",
+   "species": "Shifter",
+   "kit": [
+    {
+     "slot": "Damage ability",
+     "is_weapon": false,
+     "name": "Crushing Word",
+     "detail": "2d8 at 8 squares, WIS save for half",
+     "quality": "Superb",
+     "mod": 2,
+     "damage": "2d8",
+     "range": 8,
+     "element": "moth wings",
+     "delivery": "a sigil drawn on the air"
+    },
+    {
+     "slot": "Combat effect",
+     "is_weapon": false,
+     "name": "Hold",
+     "detail": "WIS save or stunned for a round, 6 squares",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "",
+     "range": 6,
+     "element": "cold iron",
+     "delivery": "a thrown handful of it"
+    },
+    {
+     "slot": "Healing ability",
+     "is_weapon": false,
+     "name": "Second Breath",
+     "detail": "heal yourself 1d10+3, no action needed",
+     "quality": "Fine",
+     "mod": 1,
+     "damage": "1d10",
+     "range": 1,
+     "element": "green glass",
+     "delivery": "a bell rung once"
+    }
+   ],
+   "carried": "no armour, a spellcasting focus, ink-stained hands",
+   "lines": [
+    "Crushing Word (Superb, DC 17) - 2d8 at 8 squares, WIS save for half  [moth wings, cast with a sigil drawn on the air]",
+    "Hold (Plain, DC 15) - WIS save or stunned for a round, 6 squares  [cold iron, cast with a thrown handful of it]",
+    "Second Breath (Fine, +1 to the amount healed) - heal yourself 1d10+3, no action needed  [green glass, cast with a bell rung once]"
+   ]
+  },
+  {
+   "name": "Hadrian Vanmeer",
+   "archetype": "Vanguard",
+   "species": "Dwarf (Mountain)",
+   "kit": [
+    {
+     "slot": "Heavy weapon",
+     "is_weapon": true,
+     "name": "Flanged mace",
+     "detail": "1d10, favoured where blades are banned",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "1d10",
+     "range": 1,
+     "look": "Won in a wager nobody will explain",
+     "title": null
+    },
+    {
+     "slot": "Ranged weapon",
+     "is_weapon": true,
+     "name": "Throwing axes",
+     "detail": "1d6, up to 4 squares, two of them",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "1d6",
+     "range": 4,
+     "look": "Wound with red cord for grip",
+     "title": null
+    },
+    {
+     "slot": "Combat effect",
+     "is_weapon": false,
+     "name": "Dread",
+     "detail": "WIS save or frightened, everything within 3 squares",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "",
+     "range": 3,
+     "element": "feathers",
+     "delivery": "a thrown handful of it"
+    }
+   ],
+   "carried": "chain mail and a shield, carrying flanged mace and throwing axes",
+   "lines": [
+    "Flanged mace (Plain, +0 to hit and damage) - 1d10, favoured where blades are banned  [Won in a wager nobody will explain]",
+    "Throwing axes (Plain, +0 to hit and damage) - 1d6, up to 4 squares, two of them  [Wound with red cord for grip]",
+    "Dread (Plain, DC 15) - WIS save or frightened, everything within 3 squares  [feathers, cast with a thrown handful of it]"
+   ]
+  },
+  {
+   "name": "Mordai Holderhek",
+   "archetype": "Berserker",
+   "species": "Goliath (Cloud Giant ancestry)",
+   "kit": [
+    {
+     "slot": "Heavy weapon",
+     "is_weapon": true,
+     "name": "Iron-shod pole",
+     "detail": "1d10, reach two squares, non-lethal by choice",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "1d10",
+     "range": 2,
+     "look": "Won in a wager nobody will explain",
+     "title": null
+    },
+    {
+     "slot": "Heavy weapon",
+     "is_weapon": true,
+     "name": "Warhammer",
+     "detail": "1d10, punches through plate",
+     "quality": "Plain",
+     "mod": 0,
+     "damage": "1d10",
+     "range": 1,
+     "look": "Green with verdigris",
+     "title": null
+    },
+    {
+     "slot": "Combat effect",
+     "is_weapon": false,
+     "name": "Disarm",
+     "detail": "a save or the target drops what it holds, 3 squares",
+     "quality": "Fine",
+     "mod": 1,
+     "damage": "",
+     "range": 3,
+     "element": "mirror-glass",
+     "delivery": "a line drawn on the ground"
+    }
+   ],
+   "carried": "no armour at all, old scars, carrying iron-shod pole and warhammer",
+   "lines": [
+    "Iron-shod pole (Plain, +0 to hit and damage) - 1d10, reach two squares, non-lethal by choice  [Won in a wager nobody will explain]",
+    "Warhammer (Plain, +0 to hit and damage) - 1d10, punches through plate  [Green with verdigris]",
+    "Disarm (Fine, DC 16) - a save or the target drops what it holds, 3 squares  [mirror-glass, cast with a line drawn on the ground]"
+   ]
+  }
+ ],
+ "assets": [
+  {
+   "kind": "battle_map",
+   "name": "The cell block",
+   "key": "cellblock",
+   "archetype": null,
+   "view": "battle_map_the_cell_block.webp",
+   "thumb": "battle_map_the_cell_block_t.webp",
+   "w": 1100,
+   "h": 733,
+   "verdict": "fail",
+   "terrain": [
+    "..............................",
+    "..............................",
+    "..........oo....ooo...........",
+    "...........o....o.............",
+    "..............................",
+    "..............................",
+    "...........................o..",
+    ".........................ooo..",
+    ".........................o.ooo",
+    "..............................",
+    "...........o..................",
+    "...........o.ooo.......o......",
+    "..............o.......oo......",
+    "......................o...o...",
+    "......................o.......",
+    "......................o.......",
+    ".......................o......",
+    ".......................o......",
+    "..............................",
+    ".............................."
+   ]
+  },
+  {
+   "kind": "battle_map",
+   "name": "The yard at exercise",
+   "key": "yardatexercise",
+   "archetype": null,
+   "view": "battle_map_the_yard_at_exercise.webp",
+   "thumb": "battle_map_the_yard_at_exercise_t.webp",
+   "w": 1100,
+   "h": 733,
+   "verdict": "fail",
+   "terrain": [
+    "...........o.::...:........::.",
+    "::........oo....:::...........",
+    "::...........:::..............",
+    "......::::....:...............",
+    ".......:.....o::.....oo.......",
+    "oo...........oo:.........::...",
+    ".....::........::.......::....",
+    "o:.............::.............",
+    "::::....:..................::.",
+    "..::.:..:........ooo.......::.",
+    "..::::..:::::.................",
+    "...::.:..::...................",
+    ".....::...................:...",
+    "......:.:................::.oo",
+    "......:::::...::.....:::o.....",
+    ".............o::.....:..o.....",
+    ".............o:o.......::oo...",
+    "oo.........:.o.o.......:::o.:.",
+    "........:..::oo.............:.",
+    "........:..:.................."
+   ]
+  },
+  {
+   "kind": "battle_map",
+   "name": "The gatehouse",
+   "key": "gatehouse",
+   "archetype": null,
+   "view": "battle_map_the_gatehouse.webp",
+   "thumb": "battle_map_the_gatehouse_t.webp",
+   "w": 1100,
+   "h": 733,
+   "verdict": "fail",
+   "terrain": [
+    "....#....#.........#....#.....",
+    "....#....#.........#....#.....",
+    "....#.........#....#....#.....",
+    "....#.........#....#....#.....",
+    "....#.........#....#..........",
+    ".........#....#....#..........",
+    ".........#....#....#..........",
+    ".........#....#.........#.....",
+    "....#....#....#.........#.....",
+    "....#....#....#.........#.....",
+    "....#....#.........#....#.....",
+    "....#....#.........#....#.....",
+    "....#....#.........#....#.....",
+    "....#.........#....#....#.....",
+    "....#.........#....#....#.....",
+    "....#.........#....#..........",
+    ".........#....#....#..........",
+    ".........#....#....#..........",
+    ".........#....#.........#.....",
+    "....#....#....#.........#....."
+   ]
+  },
+  {
+   "kind": "player_portrait",
+   "name": "Kestrel Silverleaf the Arcanist",
+   "key": "kestrelsilverleafthearcanist",
+   "archetype": null,
+   "view": "player_portrait_kestrel_silverleaf_the_arcanist.webp",
+   "thumb": "player_portrait_kestrel_silverleaf_the_arcanist_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "player_portrait",
+   "name": "Hadrian Vanmeer the Vanguard",
+   "key": "hadrianvanmeerthevanguard",
+   "archetype": null,
+   "view": "player_portrait_hadrian_vanmeer_the_vanguard.webp",
+   "thumb": "player_portrait_hadrian_vanmeer_the_vanguard_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "player_portrait",
+   "name": "Mordai Holderhek the Berserker",
+   "key": "mordaiholderhektheberserker",
+   "archetype": null,
+   "view": "player_portrait_mordai_holderhek_the_berserker.webp",
+   "thumb": "player_portrait_mordai_holderhek_the_berserker_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "npc_portrait",
+   "name": "The gaoler",
+   "key": "gaoler",
+   "archetype": null,
+   "view": "npc_portrait_the_gaoler.webp",
+   "thumb": "npc_portrait_the_gaoler_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "npc_portrait",
+   "name": "The prisoner",
+   "key": "prisoner",
+   "archetype": null,
+   "view": "npc_portrait_the_prisoner.webp",
+   "thumb": "npc_portrait_the_prisoner_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "npc_portrait",
+   "name": "The clerk",
+   "key": "clerk",
+   "archetype": null,
+   "view": "npc_portrait_the_clerk.webp",
+   "thumb": "npc_portrait_the_clerk_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "npc_portrait",
+   "name": "The chaplain",
+   "key": "chaplain",
+   "archetype": null,
+   "view": "npc_portrait_the_chaplain.webp",
+   "thumb": "npc_portrait_the_chaplain_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "npc_portrait",
+   "name": "The relief escort",
+   "key": "reliefescort",
+   "archetype": null,
+   "view": "npc_portrait_the_relief_escort.webp",
+   "thumb": "npc_portrait_the_relief_escort_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "boss_portrait",
+   "name": "the Evil Eel Keeper",
+   "key": "evileelkeeper",
+   "archetype": null,
+   "view": "boss_portrait_the_evil_eel_keeper.webp",
+   "thumb": "boss_portrait_the_evil_eel_keeper_t.webp",
+   "w": 886,
+   "h": 1100,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "player_token",
+   "name": "Kestrel Silverleaf",
+   "key": "kestrelsilverleaf",
+   "archetype": "Arcanist",
+   "view": "player_token_kestrel_silverleaf.webp",
+   "thumb": "player_token_kestrel_silverleaf_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "player_token",
+   "name": "Hadrian Vanmeer",
+   "key": "hadrianvanmeer",
+   "archetype": "Vanguard",
+   "view": "player_token_hadrian_vanmeer.webp",
+   "thumb": "player_token_hadrian_vanmeer_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "player_token",
+   "name": "Mordai Holderhek",
+   "key": "mordaiholderhek",
+   "archetype": "Berserker",
+   "view": "player_token_mordai_holderhek.webp",
+   "thumb": "player_token_mordai_holderhek_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "boss_token",
+   "name": "the Evil Eel Keeper",
+   "key": "evileelkeeper",
+   "archetype": null,
+   "view": "boss_token_the_evil_eel_keeper.webp",
+   "thumb": "boss_token_the_evil_eel_keeper_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "minion_token",
+   "name": "Cultist",
+   "key": "cultist",
+   "archetype": null,
+   "view": "minion_token_cultist.webp",
+   "thumb": "minion_token_cultist_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "minion_token",
+   "name": "Orc raider",
+   "key": "orcraider",
+   "archetype": null,
+   "view": "minion_token_orc_raider.webp",
+   "thumb": "minion_token_orc_raider_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "minion_token",
+   "name": "Goblin",
+   "key": "goblin",
+   "archetype": null,
+   "view": "minion_token_goblin.webp",
+   "thumb": "minion_token_goblin_t.webp",
+   "w": 1024,
+   "h": 1024,
+   "verdict": null,
+   "terrain": null
+  }
+ ]
+}
