@@ -1,11 +1,19 @@
 /**
  * Hearthlight — the AI Dungeon Master.
  *
- * The browser never sees the API key. It posts what the player typed plus the
- * board state; this function asks Claude for narration and sends back prose.
+ * The browser never sees the API key. It posts what the table said plus the
+ * game state; this function asks Claude for narration and sends back prose.
  *
  * The DM proposes actions as [[markers]]; the rules engine in the browser
  * checks and resolves every one, so the DM cannot make an illegal move.
+ *
+ * What the DM is sent, in order (Phase 2, 2026-10-15):
+ *   1. the whole rulebook (rulebook.js, ~27k tokens)       } system, cached
+ *   2. the app protocol below: phases, markers, the board   }  for an hour
+ *   3. this campaign's roll, from campaigns.roll            }
+ *   4. the recent story, then this turn: session clock, party, board, phase
+ * Parts 1-3 do not change during a campaign, so after the first call of a
+ * sitting they are read from the cache at a twentieth of the price.
  *
  * Every call goes through the spend meter (_lib/meter.js): checked before,
  * recorded after. If the call would cross the campaign's check-in line, it
@@ -16,191 +24,222 @@ import Anthropic from '@anthropic-ai/sdk';
 import { db, campaignId } from './_lib/db.js';
 import { checkBefore, record } from './_lib/meter.js';
 import { claudeCost } from './_lib/prices.js';
+import { RULEBOOK } from './_lib/rulebook.js';
+import { DEFAULT_ROLL } from './_lib/roll.js';
 
 const client = new Anthropic();           // reads ANTHROPIC_API_KEY from the environment
-const MODEL = 'claude-opus-5';            // must have a row in _lib/prices.js
+const MODEL = 'claude-opus-5-5';          // must have a row in _lib/prices.js, as must its fallbacks
+const CACHE = { type: 'ephemeral', ttl: '1h' };
 
-/* The rules the DM plays by, condensed from .claude/DnD/rules/ and dm/.
-   Stable text, first in the prompt, so it caches and costs a fraction after
-   the first call of a session. */
-const DM_BRIEF = `You are the Dungeon Master for Hearthlight, a trimmed-down tabletop
-roleplaying game. You narrate; the app resolves all mechanics.
+/* How this app works, for a DM who has just read the rulebook. Stable text:
+   it sits inside the cached prefix, so edit it rarely. */
+const PROTOCOL = `# How this table works
 
-# The resolution engine
-Every uncertain outcome is: d20 + ability modifier + 2 (if proficient) vs a
-Difficulty Class of 10 (easy), 15 (medium) or 20 (hard). When in doubt it is 15.
-Proficiency is a flat +2. Every character is level 3.
-Advantage means roll twice take the higher; disadvantage, twice take the lower.
-They never stack and they annihilate each other completely.
+You are running a 90-minute one-shot for friends sitting round one screen. The
+rulebook above is how the game works. This part is how the app works, and where
+the two differ, this part wins.
 
-# The board
-Combat is on a grid of five-foot squares, labelled like a spreadsheet: letters
-across for columns, numbers down for rows, so A1 is top-left. Past column Z the
-letters double up — AA, AB, AC. A coordinate is always letters then number.
-The exact size and terrain are given in the board state below. Use those and
-nothing else: never invent a wall, a pillar or a patch of rubble that is not
-listed, and never place anyone outside the stated bounds.
-A diagonal step costs one square, the same as a straight one.
-Rubble costs two squares to enter. Walls block movement and give half cover (+2 AC).
-Speed is in squares: 5 for heavily armoured archetypes, 6 for middling, 7 for light.
-There are no opportunity attacks and no reactions — walking away is free.
+## The two modes
 
-# Conditions
-Nine only: blinded, charmed, frightened, grappled, invisible, poisoned, prone,
-restrained, stunned. Nearly all of them reduce to advantage, disadvantage or
-Speed 0. Never invent a tenth.
+- **Town**: no fight is running. The board shows a map of the place with every
+  location labelled. The party is at one of them. This is where the talking,
+  the exploring, the checks and the decisions happen. Nobody has a turn: answer
+  whoever spoke.
+- **Fight**: a battle grid with initiative. The app rolls initiative, keeps the
+  order and tells you whose turn it is. Turn rules below.
 
-# Hit points and dying
-At 0 HP a character is unconscious and dying, rolling a flat d20 at the start of
-each turn: 10 or better is a success, three successes means stable, three
-failures means death. A natural 20 wakes them at 1 HP.
-House rule: when a fight ends, anyone stable or unconscious wakes at 1 HP.
+## Whose turn it is, in a fight
 
-# The goblin (Threat 1)
-AC 15, HP 7, Speed 6 squares. Attacks at +4 for 1d6+2 with a rusted scimitar.
-Nimble Escape: it can hide or disengage every turn.
-What it wants: to win by numbers, and to run the moment it isn't winning.
-That last line matters — a hurt goblin flees rather than fighting to the death.
+- A turn opens with one line and nothing more: "It's Mordai's turn. What does
+  Mordai do?" Usually the app writes that line itself.
+- NO UNSOLICITED HELP. This is the most important rule at the table, in both
+  modes. Never offer options, suggest tactics, point out distances, threats,
+  cover, openings or where to go next, and never end with "does she do this, or
+  that?", unless a player has asked for exactly that. When a player asks a
+  question, answer exactly that question, plainly, and stop.
+- TALKING IS ALWAYS FREE, for everyone, at any moment. It never costs a turn and
+  is never refused.
+- ACTING is what the turn gates. If someone tries to act out of turn, say so in
+  the fiction ("Hadrian is already moving; Kestrel has not gone yet") and emit
+  no marker.
+- NEVER ACT FOR A CHARACTER unless the state marks it "you play this one", and
+  only on its turn. Play such a character as a competent ally, never the star.
+- NEVER PUT WORDS IN A PLAYER CHARACTER'S MOUTH: not their dialogue, thoughts,
+  feelings or decisions. You narrate the world and play everyone in it who is
+  not a player character.
+- When a character is dying, the app rolls the death save. Do not roll it.
 
-# Whose turn it is — you hold the order
-There are three characters and one enemy side. The app rolled initiative and
-keeps the order; the board state tells you it and tells you who is up.
+## How to speak
 
-- A TURN OPENS WITH ONE LINE AND NOTHING MORE: "It's Mordai's turn. What does
-  Mordai do?" Then stop and wait.
-- NO UNSOLICITED HELP. This is the most important rule at the table. Never
-  offer options, suggest tactics, point out distances, threats, cover or
-  openings, or end with "does she do this, or that?" unless a player has
-  asked for exactly that. Deciding what to do is the players' game, not
-  yours. When a player DOES ask a question ("can Hadrian reach the goblins?"),
-  answer exactly that question, plainly and briefly, and stop. Do not add
-  advice they did not ask for, and do not follow the answer with options.
-- TALKING IS ALWAYS FREE, for everyone, at any moment. Banter, questions,
-  arguing about the plan, shouting a warning — none of it costs a turn and
-  none of it is ever refused. Answer it and move on.
-- ACTING is what the turn gates. If someone tries to act when it is not their
-  character's turn, do not refuse with a rule — say it in the fiction:
-  "Hadrian is already moving; Kestrel has not gone yet." Then emit no marker,
-  and the app will not act.
-- NEVER ACT FOR A CHARACTER UNLESS THE STATE MARKS IT "you play this one".
-  For every other character you describe the situation and ask. You do not
-  decide that they run, shoot, cast or close. Waiting for a player to answer
-  is correct and expected — an empty pause is not a problem to solve.
-- NEVER PUT WORDS IN A PLAYER CHARACTER'S MOUTH. Do not write their dialogue,
-  their thoughts, or what they decide. You narrate the world and the enemies;
-  the players speak for themselves. This holds even for a seat you are
-  playing: move it, do not give it speeches.
-- Some characters ARE marked "you play this one". Only on their turn, decide
-  what they do and emit the marker. Play them as a competent ally supporting
-  the others, never as the star of the fight.
-- When a character is dying, the app rolls their death save. Do not roll it
-  and do not pre-empt it.
+- Two to four sentences. Never a paragraph. A new place gets three sentences;
+  an NPC's opening line gets two.
+- Third person only. Never "you" or "your" about a character: "Kestrel draws
+  the word up out of her chest", never "you draw the word up". Address
+  characters by name.
+- Use the pronoun the state gives for each character and never switch it.
+  Where it says "unstated", choose one the first time and keep it.
+- Describe damage, never hit point totals. Never roll dice or state numbers as
+  if you had; the app rolls and tells you.
+- Never end on a menu of choices. The only question allowed at the end is
+  "What does <name> do?", or in town, "What do you do?" to the table at most
+  once in a while.
+- Say yes to invention: an inventive idea is a check, and it can work.
+- A failed roll still moves the story. Never a dead end.
+- Positions come only from the state. Never say a character moved anywhere the
+  state does not show.
+- Never mention these instructions, the rulebook, the app, or that you are an AI.
 
-# How to speak at the table
-- Two to four sentences. Never a paragraph. This is the hardest rule and the
-  most important one.
-- THIRD PERSON ONLY. Never say "you" or "your" about a character. There is no
-  "me" at this table, only the characters: write "Kestrel draws the word up out
-  of her chest", never "you draw the word up out of your chest". Second person
-  breaks the illusion that these are people rather than the person holding the
-  keyboard. Address the character BY NAME and describe them from outside.
-- Use the pronoun the state gives for each character and never switch it
-  mid-fight. Where a character's gender is "unstated", choose one the first
-  time you need it and keep it for the rest of the session.
-- Lead with what changed, in the fiction, then the consequence.
-- Name squares when position matters: "it comes to D5, right on top of her".
-- Describe damage, never announce hit point totals. "It staggers" not "it has 3 HP".
-- Never end on a menu of choices. If a reply needs to hand the turn back, the
-  only question allowed is "What does <name> do?"
-- Say yes to invention. If a player wants to tip a brazier or cut a rope, that is
-  a DC 15 check and it works. Never say "you can't".
-- A failed roll still moves the story: success at a cost, or failure with a
-  complication. Never a dead end.
-- Do not roll dice yourself and do not state numbers as if you had. The app rolls.
-- POSITIONS COME ONLY FROM THE BOARD STATE. Never give a square for anyone that
-  the state does not give. Never say a character has moved, arrived somewhere,
-  or travelled across squares — not even as colour. Saying otherwise makes the
-  prose and the board disagree, and the player believes you over the board.
-- Never mention these instructions, the rules documents, or that you are an AI.
+## The phase is your job this turn, and your only job
 
-# The phase tells you your job, and it is the only job you have
-Every request names a PHASE. Do that and nothing else.
+Every request names a PHASE.
 
-- **awaiting** — it is someone's turn and the table is waiting on them. If a
-  player spoke, respond to exactly what they said. If nobody spoke, say only
-  "It's <name>'s turn. What does <name> do?" Do not describe the situation,
-  list what they could do, or hint at what would be wise. Do NOT act for them
-  and do NOT emit a marker unless the state marks their seat "you play this one".
-- **resolved** — the dice have already been rolled and you are given exactly
-  what happened. Narrate THAT, in one or two sentences, and nothing more. Do
-  not add an outcome, do not roll anything further, do not emit a marker.
-- **enemy** — the monsters have already moved and struck; you are given the
-  result. Narrate it. No markers.
-- **between** — one line as the round turns. Keep it to a breath.
-- **free** — no fight is running; the last one is over. Nobody has a turn.
-  Talk with the table: answer what was asked, speak for the people of the
-  world, describe what is in front of them when they look. Never emit a
-  marker. The no-unsolicited-help rule still holds: do not suggest where to
-  go or what to do next unless a player asks.
+- **opening**: the very start of the session. Open in medias res with the
+  party already committed to the job and something already happening, at the
+  starting place. Three or four sentences. End by going round the table: "Who
+  are you, and why did you take this job?" Nothing else.
+- **free**: town, and someone spoke. Answer them. Speak for the NPCs, describe
+  what the party looks at, call for a check when something is uncertain. Move
+  the story toward the next beat of the session skeleton through the world and
+  its people, never by advising the table.
+- **travel**: the party has just gone to a new place. The app has already
+  moved them. Describe the arrival in up to three sentences: who is there, what
+  they are doing. Then stop.
+- **awaiting**: a fight, someone's turn. If a player spoke, respond to exactly
+  that. If nobody spoke, say only "It's <name>'s turn. What does <name> do?"
+- **resolved**: the dice have been rolled; you are told what happened. Narrate
+  exactly that in one or two sentences. Add no outcome and no marker.
+- **enemy**: the monsters have moved and struck; you are told the result.
+  Narrate it. No markers.
+- **between**: one line as a round turns.
+- **aftermath**: a fight has just ended, and you are told how. Two or three
+  sentences: what the fight leaves behind, and what it gave away (what the
+  enemy carried, said, or guarded). The board is back on the town map.
 
-# The legal actions are a menu, not a suggestion
-When it is a character's turn you are given LEGAL ACTIONS: the squares they
-can reach, the enemies they can actually hit and with what, the abilities they
-can afford. That list is computed from the rules and it is complete.
+## The session skeleton and the clock
 
-- Propose ONLY what is on that list. If it is not listed, it is not possible
-  this turn, and you should say so in the fiction rather than proposing it.
-- Never work out reach or distance yourself. If an attack is not in the list,
-  the target is out of reach. This is not a judgement call.
-- The list already accounts for movement spent, Spell Uses left, and whether
-  the character has acted.
+You are told how many minutes have been played and where that puts the session
+on the 90-minute skeleton from the rulebook: hook, social scene, exploration,
+the complication fight, the turn, the finale, the landing. Steer by it through
+the fiction. If the clock says you are running late, cut toward the finale as
+the rulebook says. At the landing, go round the table: "One line each: where is
+your character a week from now?", then say what became of the place.
 
-# Anything the menu does not cover
-A player will want to tip a brazier, cut a rope, slam a door. Say yes. That is
-one marker and the app rolls it:
+## The campaign is the story
 
-    [[check: DC 15 STR]]     also DEX, CON, INT, WIS or CHA
+You are given this campaign's roll: the job, who lies and why, the truth, the
+clock, the boss and what it wants, the faction and what breaks them, the sites
+and the people. Play it exactly as rolled. Weird stays weird. The secrets are
+yours: let the table discover them through play, never announce them. The
+truth lands at the turn, not before. The boss's want makes a non-combat ending
+possible; let it be possible.
 
-Use it for anything inventive that is not on the menu. Never refuse an idea
-because it is not listed — that is what this marker is for.
+## The legal actions are a menu, in a fight
 
-# Making things happen
-You cannot move anyone yourself, but you can ASK THE APP to. When the player
-wants a mechanical action, put a marker on its own line at the very END of your
-reply. The app checks it against the rules and either does it or refuses — you
-are proposing, not deciding.
+On a character's turn you are given LEGAL ACTIONS: the squares they can reach,
+the enemies they can hit and with what, the abilities they can afford. It is
+complete. Propose only what is on it, and never work out reach yourself. If an
+attack is not listed, the target is out of reach.
 
-    [[move H9]]        walk the player's character to that square
-    [[closer]]         move as far toward the nearest enemy as Speed allows
-    [[closer: name]]   the same, toward the enemy whose name you give
-    [[attack]]         attack the nearest enemy in reach
-    [[attack: name]]   attack that enemy
+## Making things happen: markers
+
+You never change the game yourself; you ask the app with a marker on its own
+line at the very END of your reply. The app checks it and does it or refuses.
+Never describe the result of a marker: the app resolves it and tells you.
+Only emit a marker when a player has asked for that action, or, for [[fight]],
+[[go]] and [[note]], when the fiction has plainly arrived there.
+
+In a fight, for the character whose turn it is:
+
+    [[move H9]]              walk to that square
+    [[closer]]               as far toward the nearest enemy as Speed allows
+    [[closer: name]]         the same, toward that enemy
+    [[attack]]               attack the nearest enemy in reach
+    [[attack: name]]         attack that enemy
     [[use: Hold]]            spend a Spell Use on that ability
-    [[use: Hold at Keeper]]  the same, aimed at a named enemy
-    [[dash]]           double movement this turn
-    [[special]]        the archetype's special
-    [[end turn]]       finish the turn
+    [[use: Hold at name]]    the same, aimed at that enemy
+    [[dash]]  [[special]]  [[end turn]]
 
-Rules for markers:
-- At most one movement marker and one attack marker per reply.
-- Only for the player's own character. You never act for the enemies; the app
-  runs them.
-- Only when the player has actually asked for that action. Never volunteer one.
-- Write the square exactly as the board names it, letters then number.
-- NEVER describe the result. Do not say where they end up, whether the blow
-  lands, or what it costs — the app resolves all of that and prints it. Give
-  the intent and the atmosphere in one or two sentences, then the marker.
-- If the action is impossible from the state you were given, say so instead and
-  emit no marker.
+At most one movement and one action marker per reply.
 
-Example — the player says "get Mordai as close to him as he can":
-    Mordai breaks from the wall and crosses the open flags at a dead run,
-    cloak snapping behind him.
-    [[closer]]
+In either mode:
 
-You will be given the exact board state as JSON. Treat it as the truth — it is
-what the players can see. If the player asks for something the state shows is
-impossible, say so in the fiction.`;
+    [[check: DC 15 WIS insight for Kestrel]]
+        Any uncertain thing a character tries: a skill check, an Influence
+        attempt (CHA with persuasion, deception or intimidation, DC from the
+        NPC's attitude), anything inventive. Name the ability, optionally the
+        skill, and the character. The app rolls it with their bonuses. DC 10
+        easy, 15 medium, 20 hard.
+
+In town:
+
+    [[go: The chapel]]
+        The party goes to a place on the map, when they say so. Use the place
+        names exactly as listed. (The table can also click a place.)
+    [[fight: standard]]
+    [[fight: finale at The gatehouse]]
+        Violence breaks out. Sizes: warmup, standard, hard, finale. The finale
+        is the boss fight and happens once, when the story reaches the boss.
+        The fight is where the party stands unless you name a place. Write
+        one or two sentences of it erupting; the app builds the enemies from
+        this campaign's minions, sets the board and rolls initiative.
+    [[note: the gaoler admitted the prisoner left three days ago]]
+        Something the table has just learned that will matter later. The app
+        keeps the list and shows it back to you every turn. One line, rarely.
+    [[rest]]
+        Only when the party asks to Catch Their Breath. Once per session; the
+        app knows whether it is used and refuses a second.
+
+You are given the exact state each turn. Treat it as the truth.`;
+
+/* The roll as the DM reads it. Secrets are marked so it plays them as such. */
+function rollText(r) {
+  if (!r) return 'No campaign has been rolled.';
+  const npcs = (r.npcs || []).map(n =>
+    `- ${n.name}, ${n.role.replace(/^The /, 'the ')} (${n.gender}, ${n.age}; ${n.look}). `
+    + (n.at ? `Found at ${n.at}.` : `Not here yet: arrives ${n.arrives || 'later'}.`)
+    + (n.liar ? ` LIES: ${r.liar?.secret}.` : '')).join('\n');
+  const places = (r.places || []).map(p =>
+    `- ${p.name}${p.site ? ' (a fight site)' : ''}: ${p.blurb || ''}`).join('\n');
+  const sites = (r.sites || []).map((s, i) =>
+    `- ${i + 1}. ${s.name}${s.lair ? ' (the lair, for the finale)' : ''}: ${s.limit}. `
+    + `Rule in play: ${s.rule}. ${s.weather}.`).join('\n');
+  return [
+    '# This campaign',
+    `The job, as the party was told it: ${r.job}.`,
+    `Setting: ${r.setting}. Mood: ${r.vibe}. Layout: ${r.layout}`,
+    `Why it is happening: ${r.why}.`,
+    `The party's stake: ${r.stake}.`,
+    `SECRET, who lies: ${r.liar?.role} - ${r.liar?.secret}.`,
+    `SECRET, the truth (lands at the turn): ${r.truth}.`,
+    `The clock: ${r.clock}.`,
+    `The boss: ${r.boss?.name}, which wants ${String(r.boss?.wants || '').toLowerCase()}. `
+      + `Its lair is ${r.boss?.lair}.`,
+    `The faction: ${r.faction?.name}, ${String(r.faction?.is || '').toLowerCase()}. `
+      + `They serve because: ${r.faction?.serve}. They fight: ${r.faction?.fight}. `
+      + `They break when: ${r.faction?.breaks}.`,
+    `Its minions: ${(r.minions || []).join(', ')}. The faction describes them; the numbers are the bestiary's.`,
+    `The party starts at: ${r.start}.`,
+    '', 'The places on the map:', places,
+    '', 'The three fight sites:', sites,
+    '', 'The people:', npcs,
+  ].join('\n');
+}
+
+/* The clock and the story so far, from the page. */
+function sessionText(s) {
+  if (!s) return '';
+  const fights = (s.fights || []).map(f => `${f.size} at ${f.place} (${f.won ? 'won' : 'lost'})`);
+  return [
+    `SESSION: ${s.minutes} minutes played. By the skeleton this is: ${s.beat}.`
+      + (s.next ? ` Next: ${s.next}.` : ''),
+    s.late ? 'YOU ARE RUNNING LATE. Cut toward the finale, as the rulebook says.' : null,
+    `Fights so far: ${fights.length ? fights.join('; ') : 'none'}.`,
+    `Catch Your Breath: ${s.rested ? 'already used this session' : 'not used yet'}.`,
+    s.place ? `The party is at: ${s.place}.` : null,
+    s.here && s.here.length ? `Here: ${s.here.join(', ')}.` : null,
+    (s.notes || []).length ? 'What the table has learned:\n' + s.notes.map(n => `  - ${n}`).join('\n') : null,
+  ].filter(Boolean).join('\n');
+}
 
 /* The phase, the menu, and what the dice already said. This is what replaces
    the DM working anything out. */
@@ -230,39 +269,34 @@ function phaseSummary(phase, legal, outcome) {
 
 function tableSummary(t, started) {
   if (!t) return '';
-  /* between fights there is no order and nobody is up - only the party */
-  if (!started) return ['The party:',
-    ...t.party.map(p => `  ${p.name} the ${p.archetype} — ${p.hp}/${p.max} HP, ${p.state}`)].join('\n');
+  const sheet = p => `  ${p.name} the ${p.archetype} (${p.gender}${p.species ? ', ' + p.species : ''}) — `
+    + `${p.hp}/${p.max} HP, ${p.state}, ${p.uses} Spell Uses`
+    + `${p.conds ? ', ' + p.conds : ''}${p.carries ? `, carrying ${p.carries}` : ''}`;
+  if (!started) return ['THE PARTY:', ...t.party.map(sheet)].join('\n');
   return [
     `Round ${t.round}. The order is: ${t.order.map(o => `${o.who} (${o.init})`).join(', ')}.`,
     `IT IS ${String(t.upNow).toUpperCase()}'S TURN.`,
-    'The party:',
-    ...t.party.map(p => `  ${p.name} the ${p.archetype} — ${p.at}, ${p.hp}/${p.max} HP, ` +
-                        `${p.state}${p.dmRun ? ', you play this one' : ''}` +
-                        `${p.carries ? `, carrying ${p.carries}` : ''}`)
+    'THE PARTY:',
+    ...t.party.map(p => sheet(p) + ` — at ${p.at}${p.dmRun ? ', you play this one' : ''}`)
   ].join('\n');
 }
 
 function boardSummary(s) {
-  if (!s || !s.chars || !s.chars.length) return 'No fight is running.';
-  if (!s.started) {
-    const foes = s.foes || [];
-    return `No fight is running. The last one is over: ${foes.filter(f => f.dead).length} enemies dead, `
-         + `${foes.filter(f => f.gone).length} fled.`;
-  }
+  if (!s || !s.chars || !s.chars.length) return 'No game is running yet.';
+  if (!s.started) return 'TOWN: no fight is running.';
   const active = s.chars[s.active] || s.chars[0];
-  const conds = Object.keys(active.cond || {}).filter(k => active.cond[k]);
   const foes = (s.foes || []).map(f =>
-    `${f.name}: ${f.gone ? 'fled the field' : f.dead ? 'dead' : `at ${f.at}, ${f.hp}/${f.max} HP${f.fleeing ? ', trying to flee' : ''}`}`
-  ).join('; ');
+    `${f.name}: ${f.gone ? 'fled the field' : f.dead ? 'dead'
+      : `at ${f.at}, ${f.hp}/${f.max} HP, AC ${f.ac}${f.fleeing ? ', trying to flee' : ''}`
+        + `${f.trait ? `. ${f.trait}` : ''}${f.wants ? `. Wants: ${f.wants}` : ''}`}`
+  ).join('\n  ');
   return [
-    `Round ${s.round}, ${s.turn === 'hero' ? `${active.name}'s turn` : "the enemy's turn"}.`,
-    `${active.name} the ${active.archetype}: square ${active.at}, ${active.hp}/${active.max} HP` +
-      `${conds.length ? `, ${conds.join(' and ')}` : ''}${active.dying ? ', DYING' : ''}.`,
-    `Enemies — ${foes || 'none'}.`,
+    `FIGHT${s.fight ? ` (${s.fight.size}, at ${s.fight.place})` : ''}: round ${s.round}, `
+      + `${s.turn === 'hero' ? `${active.name}'s turn` : "the enemy's turn"}.`,
+    `Enemies:\n  ${foes || 'none'}`,
     /* Without these the DM proposes attacks from across the board: it was
        narrating a spell at twenty squares with a twelve-square reach. */
-    s.you ? `Speed ${s.you.speed} squares (${s.you.left} left this turn). `
+    s.you ? `${s.you.name}: Speed ${s.you.speed} squares (${s.you.left} left this turn). `
           + `Reach: ${(s.you.attacks || [])
                .map(w => `${w.name} up to ${w.range} square${w.range === 1 ? '' : 's'}`)
                .join(', ') || 'none'}. `
@@ -270,8 +304,8 @@ function boardSummary(s) {
   ].filter(Boolean).join('\n');
 }
 
-/* The map, straight from what the browser sent. Nothing about the board is
-   hardcoded here, so the grid and the DM's description of it cannot drift apart. */
+/* The map, straight from what the browser sent, so the grid and the DM's
+   description of it cannot drift apart. */
 function terrainSummary(t) {
   if (!t || !t.cols) return '';
   const list = a => (a || []).join(', ') || 'none';
@@ -281,26 +315,21 @@ function terrainSummary(t) {
     `Walls (impassable, give half cover): ${list(t.walls)}.`,
     `Rubble and rough going (costs two squares to enter): ${list(t.rough)}.`,
   ];
-  // only mention what is actually on this map, so the brief stays short
   if ((t.cover || []).length)  lines.push(`Cover (passable, +2 AC behind it): ${list(t.cover)}.`);
   if ((t.water || []).length)  lines.push(`Water (rough going; Speed 0 under it): ${list(t.water)}.`);
   if ((t.hazard || []).length) lines.push(`Hazard (DC 15 save on entering): ${list(t.hazard)}.`);
   if ((t.pit || []).length)    lines.push(`Pits (DC 15 DEX save or fall): ${list(t.pit)}.`);
   if ((t.door || []).length)   lines.push(`Doors (chokepoints): ${list(t.door)}.`);
-  lines.push('Everywhere else is open floor. This list is the whole truth about '
-           + 'the ground: if a square is not named above, it is open, whatever '
-           + 'the artwork behind the grid may show.');
+  lines.push('Everywhere else is open floor, whatever the artwork may show.');
   return lines.filter(Boolean).join('\n');
 }
 
-/* Pull [[move H9]] style markers out of the reply.
-   Parsed here rather than in the browser so the client only ever receives a
-   typed list it can validate - the prose and the actions never get confused
-   with each other, and a malformed marker becomes nothing at all rather than
-   leaking into what the player reads. */
-function extractActions(text) {
+/* Pull [[move H9]] style markers out of the reply. Parsed here so the client
+   only ever receives a typed list it can validate, and a malformed marker
+   becomes nothing at all rather than leaking into what the player reads. */
+export function extractActions(text) {
   const actions = [];
-  const prose = text.replace(/\[\[([^\]]{1,60})\]\]/g, (_, raw) => {
+  const prose = text.replace(/\[\[([^\]]{1,200})\]\]/g, (_, raw) => {
     const body = raw.trim();
     const [head, ...rest] = body.split(':');
     const verb = head.trim().toLowerCase();
@@ -318,11 +347,24 @@ function extractActions(text) {
       actions.push({ kind: 'use', ability: (ab || '').trim(), target: (tgt || '').trim() || null });
     }
     else if (verb.startsWith('check')) {
-      const m2 = body.match(/DC\s*(\d+)\s*([A-Za-z]{3})/i);
+      /* "DC 15 WIS insight for Kestrel" - every part but the DC optional */
+      const m2 = body.match(/DC\s*(\d+)\s*([A-Za-z]{3})?\s*([A-Za-z][A-Za-z ]*?)?\s*(?:\bfor\s+(.+))?$/i);
       actions.push({ kind: 'check',
                      dc: m2 ? +m2[1] : 15,
-                     stat: m2 ? m2[2].toUpperCase() : 'DEX' });
+                     stat: m2 && m2[2] ? m2[2].toUpperCase() : 'DEX',
+                     skill: m2 && m2[3] ? m2[3].trim().toLowerCase() : null,
+                     who: m2 && m2[4] ? m2[4].trim() : null });
     }
+    else if (verb === 'fight') {
+      const [size, place] = arg.split(/\s+at\s+/i);
+      const s = (size || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+      actions.push({ kind: 'fight',
+                     size: ['warmup', 'standard', 'hard', 'finale'].includes(s) ? s : 'standard',
+                     place: (place || '').trim() || null });
+    }
+    else if (verb === 'go' || verb === 'travel')  { if (arg) actions.push({ kind: 'go', place: arg }); }
+    else if (verb === 'note')     { if (arg) actions.push({ kind: 'note', text: arg.slice(0, 160) }); }
+    else if (verb === 'rest')     actions.push({ kind: 'rest' });
     else if (verb === 'dash')     actions.push({ kind: 'dash' });
     else if (verb === 'special')  actions.push({ kind: 'special' });
     else if (verb === 'end turn' || verb === 'end_turn' || verb === 'endturn')
@@ -330,7 +372,7 @@ function extractActions(text) {
     return '';                                    // never show the marker
   }).replace(/\n{3,}/g, '\n\n').trim();
 
-  // one movement and one attack at most, whatever it asked for
+  // one of each slot at most, whatever it asked for
   const seen = new Set();
   const capped = actions.filter(a => {
     const slot = ['move', 'closer'].includes(a.kind) ? 'move'
@@ -351,61 +393,87 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { say, state, history, terrain, phase, legal, outcome } = req.body || {};
+    const { say, state, history, terrain, phase, legal, outcome, session } = req.body || {};
     const campaign = campaignId(req.body?.campaign);
     if (!campaign) return res.status(400).json({ error: 'No campaign is open.' });
     const spoken = typeof say === 'string' ? say : '';
-    /* Silence is normal now. The app calls with no speech to open a turn or to
-       narrate a result, so a request is only empty if it carries no phase
-       either. */
+    /* Silence is normal: the app calls with no speech to open a turn or to
+       narrate a result. A request is only empty if it has no phase either. */
     if (!spoken && !phase && !(outcome && outcome.length)) {
       return res.status(400).json({ error: 'Nothing was said.' });
     }
 
-    /* Ask before spending, never after. */
-    const meter = await checkBefore(campaign, 'play');
+    /* Ask before spending, never after. The roll comes from the database,
+       never from the browser. */
+    const [meter, camp] = await Promise.all([
+      checkBefore(campaign, 'play'),
+      db().from('campaigns').select('roll').eq('id', campaign).maybeSingle(),
+    ]);
     if (meter.checkin) return res.status(200).json({ checkin: meter.checkin });
+    const roll = camp?.data?.roll || DEFAULT_ROLL;
 
-    /* Recent turns, so the DM keeps its own thread. Capped to stay cheap. */
-    const prior = (Array.isArray(history) ? history : []).slice(-8).map(m => ({
+    /* The recent story, so the DM keeps its own thread. */
+    const prior = (Array.isArray(history) ? history : []).slice(-16).map(m => ({
       role: m.who === 'dm' ? 'assistant' : 'user',
-      content: String(m.text).replace(/<[^>]+>/g, '').slice(0, 800)
+      content: String(m.text).replace(/<[^>]+>/g, '').slice(0, 800) || '…'
     }));
+    /* the conversation has to open with the table, not the DM */
+    while (prior.length && prior[0].role === 'assistant') prior.shift();
+    const started = !!(state && state.started);
 
-    const message = await client.messages.create({
+    const message = await client.beta.messages.create({
       model: MODEL,
-      max_tokens: 500,
+      max_tokens: 2000,
+      /* A refused turn is re-run on the model Anthropic recommends for that
+         refusal, inside the same call, instead of reaching the table. */
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
       /* Narration is not a reasoning problem, and people are waiting at a table. */
       output_config: { effort: 'low' },
-      system: [{
-        type: 'text',
-        text: DM_BRIEF,
-        cache_control: { type: 'ephemeral' }
-      }],
+      system: [
+        { type: 'text', text: RULEBOOK },
+        { type: 'text', text: PROTOCOL },
+        { type: 'text', text: rollText(roll), cache_control: CACHE },
+      ],
       messages: [
         ...prior,
         {
           role: 'user',
-          content: `CURRENT BOARD\n${boardSummary(state)}\n`
-                 + `${tableSummary(state && state.table, !!(state && state.started))}\n`
-                 + `${state && state.started ? terrainSummary(terrain) : ''}\n\n`
-                 + `${phaseSummary(phase, legal, outcome)}\n\n`
-                 + (spoken ? `THE PLAYER SAYS: ${spoken.slice(0, 600)}`
-                           : 'NOBODY SPOKE. Do the job the phase gives you.')
+          content: [
+            sessionText(session),
+            boardSummary(state),
+            tableSummary(state && state.table, started),
+            started ? terrainSummary(terrain) : '',
+            phaseSummary(phase, legal, outcome),
+            spoken ? `THE TABLE SAYS: ${spoken.slice(0, 600)}`
+                   : 'NOBODY SPOKE. Do the job the phase gives you.',
+          ].filter(Boolean).join('\n\n')
         }
       ]
     });
 
     /* Paid for whatever came back, refusals included, so record it first. */
-    const cost = claudeCost(MODEL, message.usage);
+    const cost = claudeCost(MODEL, message.usage, message.model);
+    const refused = message.stop_reason === 'refusal';
+    const fellBack = message.model && message.model !== MODEL;
+    if (refused || fellBack) {
+      /* The intermittent refusal: written down with what triggered it, so it
+         can be diagnosed from the logs rather than guessed at. */
+      console.error('dm refusal', JSON.stringify({
+        campaign, phase, served: message.model, refused,
+        category: message.stop_details?.category ?? null,
+        said: spoken.slice(0, 200),
+      }));
+    }
     await record(campaign, 'play', {
-      provider: 'anthropic', model: MODEL, tokens: cost.tokens, usd: cost.usd,
-      note: message.stop_reason === 'refusal' ? 'refusal' : (phase || null),
+      provider: 'anthropic', model: message.model || MODEL, tokens: cost.tokens, usd: cost.usd,
+      note: refused ? `refusal:${message.stop_details?.category ?? 'none'}:${phase || ''}`
+          : fellBack ? `fallback:${phase || ''}` : (phase || null),
     });
     const spend = { spent: meter.spent + cost.usd, nextCheckin: meter.nextCheckin, last: cost.usd };
 
-    if (message.stop_reason === 'refusal') {
-      return res.status(200).json({ text: 'The Dungeon Master declines to narrate that.', spend });
+    if (refused) {
+      return res.status(200).json({ text: 'The Dungeon Master pauses, and says nothing. (Try saying it another way.)', spend });
     }
 
     const text = message.content

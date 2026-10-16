@@ -289,8 +289,35 @@
   code.save { display: block; background: var(--grid); padding: 6px 8px; border-radius: 5px;
               font-size: .68rem; word-break: break-word; margin: 6px 0; line-height: 1.45; }
 
+  /* ---- the town map: where the party is between fights ----
+     The buildings are drawn from the roll's plan and the labels are HTML on
+     top, so every label is legible and sits on the building it names. A
+     painted Gemini picture goes behind the same plan later. */
+  .townwrap { aspect-ratio: 3 / 2; max-height: 100%; max-width: 100%; width: 100%;
+              position: relative; display: none; overflow: hidden;
+              border: 1px solid var(--line); border-radius: 9px; background: var(--grid); }
+  .townwrap.on { display: block; }
+  .townwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .townwrap .plot { fill: var(--panel); stroke: var(--line); stroke-width: 1.5;
+                    vector-effect: non-scaling-stroke; }
+  .townwrap .plot.site { fill: var(--grid2); stroke: var(--muted); stroke-dasharray: 5 4; }
+  .townwrap .plot.here { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; }
+  .pin { position: absolute; transform: translate(-50%, -50%); max-width: 24%;
+         text-align: center; font-size: .76rem; font-weight: 700; line-height: 1.25;
+         padding: 4px 9px; border-radius: 7px; background: var(--panel);
+         border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+  .pin small { display: block; font-weight: 500; font-size: .62rem; color: var(--muted); }
+  .pin .tag { display: block; font-size: .55rem; text-transform: uppercase;
+              letter-spacing: .07em; color: var(--accent); }
+  .pin.here { border: 2px solid var(--accent); }
+  .townnote { position: absolute; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted); }
+  .party { display: flex; flex-direction: column; gap: 6px; }
+  .party .who { font-size: .8rem; }
+
   /* narrow windows: stack and allow scrolling rather than crushing everything */
   @media (max-width: 1100px), (max-height: 520px) {
+    .townwrap { max-height: none; }
+    .pin { font-size: .62rem; padding: 3px 5px; }
     body { overflow: auto; }
     .boardarea { flex: none; grid-template-columns: 1fr; }
     .caststrip { flex-direction: row; overflow-x: auto; }
@@ -309,13 +336,14 @@
   <h1>Hearthlight</h1>
   <button class="pill link" id="campaignpill" title="Switch campaign">no campaign</button>
   <span class="pill" id="roundpill">no fight yet</span>
+  <span class="pill" id="clockpill" title="Time played this session, and where that is on the 90-minute skeleton">0:00</span>
   <span class="pill" id="turnpill" style="display:none"></span>
   <span id="hint">Pick an archetype below and start a fight.</span>
   <span class="spacer"></span>
   <span class="pill" id="foespill">—</span>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h3</span>
+  <span class="pill" id="buildpill" title="build">h4</span>
 </header>
 
 <!-- the big view, for showing everyone at the table one picture -->
@@ -342,14 +370,15 @@
 
 <div class="boardarea">
   <div class="boardpane">
-    <div class="boardwrap"><table id="board"></table></div>
+    <div class="boardwrap" id="boardwrap"><table id="board"></table></div>
+    <div class="townwrap" id="town"></div>
 
-    <div class="legend">
+    <div class="legend" id="legend">
       <span><i class="sw" style="background:var(--move)"></i> can reach</span>
       <span><i class="sw" style="background:var(--rough)"></i> rubble, costs 2</span>
       <span><i class="sw" style="background:var(--wall)"></i> wall</span>
       <span><i class="sw" style="background:var(--heroBg);border-color:var(--hero)"></i> you</span>
-      <span><i class="sw" style="background:var(--foeBg);border-color:var(--foe)"></i> G1, G2… enemies</span>
+      <span><i class="sw" style="background:var(--foeBg);border-color:var(--foe)"></i> enemies</span>
       <span>hover a token for its name and health</span>
     </div>
   </div>
@@ -367,7 +396,7 @@
     </div>
     <div class="chatbox">
       <textarea id="chatin" rows="2"
-        placeholder="Say what your character does — &quot;move to F6&quot;, &quot;attack Goblin #2&quot;, or just talk."></textarea>
+        placeholder="Say what your characters do — &quot;we go to the chapel&quot;, &quot;Kestrel asks the gaoler&quot;, &quot;attack Cultist #2&quot;, or just talk."></textarea>
       <div class="foot">
         <small id="chatnote">Enter to send · Shift+Enter for a new line</small>
         <button id="bSend" class="primary">Send</button>
@@ -388,27 +417,23 @@
       <select id="pick"></select>
     </div>
     <div id="partyline" class="muted" style="display:none"></div>
-    <label class="fld" for="nfoes">Enemies</label>
-    <select id="nfoes">
-      <option value="1">1 — Threat 1</option>
-      <option value="2" selected>2 — Threat 2</option>
-      <option value="3">3 — Threat 3</option>
-      <option value="4">4 — Threat 4</option>
+    <!-- The DM starts fights itself; this is for starting one by hand. -->
+    <label class="fld" for="fsize">Fight here, by hand</label>
+    <select id="fsize">
+      <option value="warmup">Warm-up — 1 × players</option>
+      <option value="standard" selected>Standard — 2 × players</option>
+      <option value="hard">Hard — 3 × players</option>
+      <option value="finale">Finale — the boss and friends</option>
     </select>
     <div class="row" style="margin-top:8px">
       <button id="bStart" class="primary">Start fight</button>
-      <button id="bReset">Reset</button>
+      <button id="bReset" title="Throw this session away and start again from the opening">New session</button>
     </div>
     <label class="fld" for="who">You play</label>
     <select id="who"></select>
     <label class="fld" style="display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="checkbox" id="dmruns" checked> DM plays the others
     </label>
-    <label>Scene</label>
-    <select id="scene"></select>
-    <div class="row" style="margin-top:6px">
-      <button id="bScene">Load scene</button>
-    </div>
     <code class="save" id="saveline">—</code>
     <div class="row">
       <button id="bSave">Save</button>
@@ -532,25 +557,193 @@ const ARCHETYPES = {
                special:'Divine Smite' }
 };
 
-/* GOBLIN — rules/07-monsters.md, Threat 1 */
-const GOBLIN = { ac:15, hp:7, speed:6, hit:4, dice:[1,6], bonus:2 };
-const PARTY_STARTS = ['D9', 'C11', 'E12'];
-const FOE_STARTS = ['L4','N7','P11','R14'];   /* 8, 10, 12 and 14 squares out */
+/* Ability modifiers (STR DEX CON INT WIS CHA), saves and skills, from
+   rules/06-archetypes.md. Checks and saves read these; proficiency is +2. */
+const ABIL = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const SHEETS = {
+  Vanguard:  { mods: [3, 1, 3, 0, 1, -1], saves: ['str', 'con'],
+               skills: ['athletics', 'perception', 'intimidation'] },
+  Shadow:    { mods: [0, 3, 2, 1, 1, 2],  saves: ['dex', 'int'],
+               skills: ['stealth', 'sleight of hand', 'investigation', 'deception', 'acrobatics', 'perception'] },
+  Arcanist:  { mods: [-1, 2, 2, 3, 1, 0], saves: ['int', 'wis'],
+               skills: ['arcana', 'history', 'investigation', 'insight'] },
+  Warden:    { mods: [2, 0, 2, 0, 3, 1],  saves: ['wis', 'cha'],
+               skills: ['medicine', 'insight', 'religion', 'persuasion'] },
+  Hunter:    { mods: [1, 3, 2, 0, 2, 0],  saves: ['str', 'dex'],
+               skills: ['survival', 'perception', 'nature', 'stealth', 'animal handling'] },
+  Berserker: { mods: [3, 2, 3, -1, 1, 0], saves: ['str', 'con'],
+               skills: ['athletics', 'survival', 'intimidation', 'perception'] },
+  Skald:     { mods: [0, 2, 2, 1, 0, 3],  saves: ['dex', 'cha'],
+               skills: ['persuasion', 'deception', 'performance', 'insight', 'history', 'sleight of hand'] },
+  Oathsworn: { mods: [3, 0, 2, 0, 1, 2],  saves: ['wis', 'cha'],
+               skills: ['persuasion', 'intimidation', 'religion', 'athletics'] },
+};
+const sheetOf = c => SHEETS[c.archetype] || SHEETS.Vanguard;
+const checkBonus = (c, abil, skill) => sheetOf(c).mods[Math.max(0, ABIL.indexOf(abil))]
+  + (skill && sheetOf(c).skills.includes(skill) ? 2 : 0);
+const saveBonus = (c, abil) => sheetOf(c).mods[Math.max(0, ABIL.indexOf(abil))]
+  + (sheetOf(c).saves.includes(abil) ? 2 : 0);
+
+/* ---------- monsters, rules/07-monsters.md, as numbers ------------------
+   One attack is hit / dice / bonus; n is how many it makes; reach is in
+   squares (a ranged attacker simply has a long one). The trait and wants are
+   the DM's to play; the engine runs the numbers, and the one trait worth
+   automating, a burst (the Eel's Discharge), is a burst here. */
+const M = (threat, ac, hp, speed, hit, dice, bonus, more) =>
+  ({ threat, ac, hp, speed, hit, dice, bonus, n: 1, reach: 1, ...more });
+const BESTIARY = {
+  'goblin':          M(1, 15, 7, 6, 4, [1, 6], 2,  { flees: true, trait: 'Nimble Escape: can hide or disengage every turn',
+                                                     wants: "to win by numbers, and to run the moment it isn't winning" }),
+  'skeleton':        M(1, 13, 13, 6, 4, [1, 6], 2, { trait: 'Bone: half damage from slashing, falls apart to a blunt hit',
+                                                     wants: 'exactly what it was told to want, forever' }),
+  'cultist':         M(1, 12, 9, 6, 3, [1, 6], 1,  { trait: 'Fanatic: cannot be frightened while its leader lives',
+                                                     wants: 'to finish the ritual; fighting is a distraction it resents' }),
+  'giant rat':       M(1, 12, 7, 6, 4, [1, 4], 2,  { trait: 'Pack', wants: 'food, yours or you' }),
+  'orc raider':      M(2, 13, 15, 6, 5, [1, 12], 3, { trait: 'Aggressive: charges, and keeps charging',
+                                                     wants: 'to reach the smallest person in the room' }),
+  'bandit':          M(2, 12, 11, 6, 3, [1, 6], 1, { flees: true, trait: 'Surrenders at half HP, and knows things',
+                                                     wants: 'your money, and to live to spend it' }),
+  'giant spider':    M(2, 14, 26, 6, 5, [1, 8], 3, { trait: 'Web', wants: 'to wrap something and drag it upward' }),
+  'zombie':          M(2, 8, 22, 4, 3, [1, 6], 1,  { trait: 'Undead Fortitude', wants: 'to reach you' }),
+  'dire wolf':       M(2, 14, 24, 10, 5, [1, 10], 3, { trait: 'Knockdown', wants: 'to separate one of you from the rest' }),
+  'ogre':            M(4, 11, 45, 8, 6, [2, 8], 4, { wants: 'to break the loudest thing first' }),
+  'ghoul':           M(4, 12, 30, 6, 4, [2, 6], 2, { wants: 'to feed, starting with whoever stops moving' }),
+  'animated armour': M(4, 18, 33, 5, 4, [1, 6], 2, { n: 2, wants: 'to stop anyone passing' }),
+  'owlbear':         M(4, 13, 42, 8, 7, [1, 10], 5, { wants: 'its nest left alone' }),
+};
+/* The rolled boss creature -> its Threat 8 block. Swimmers move at their swim
+   speed through anything, which is how a desert kraken works. */
+const BOSSES = {
+  'orc':         M(8, 16, 65, 6, 6, [1, 12], 4, { n: 2, trait: 'Warcry; Bloodied: a third attack below half HP' }),
+  'necromancer': M(8, 12, 40, 6, 6, [3, 6], 0,  { reach: 12, trait: 'Raise: once per fight, three skeletons; Shield' }),
+  'dragon':      M(8, 17, 75, 16, 7, [2, 10], 4, { trait: 'Breath; Frightful Presence' }),
+  'wizard':      M(8, 13, 55, 6, 7, [2, 10], 3, { reach: 24, trait: 'Blink: teleports 6 squares after its turn; Fireball once' }),
+  'goblin':      M(8, 17, 50, 6, 7, [1, 8], 4,  { n: 2, trait: 'Nimble Escape; Rabble: goblins keep arriving above half HP' }),
+  'kraken':      M(8, 16, 80, 12, 7, [2, 8], 4, { n: 2, reach: 3, trait: 'Grasp: a tentacle hit grapples (escape DC 15); Ink once' }),
+  'troll':       M(8, 15, 70, 6, 7, [2, 6], 4,  { n: 2, trait: 'Regeneration 10 a turn unless fire or acid; will not stay down' }),
+  'ogre':        M(8, 13, 80, 8, 7, [2, 10], 4, { reach: 2, trait: 'Sweep; Throw' }),
+  'ghoul':       M(8, 14, 60, 6, 7, [2, 8], 4,  { n: 2, trait: 'Paralysing Touch; Stench' }),
+  'witch':       M(8, 15, 60, 6, 7, [2, 8], 4,  { trait: 'Curse: charms one creature a turn; Bargain' }),
+  'knight':      M(8, 18, 65, 5, 7, [2, 6], 4,  { n: 2, trait: 'Command: allies within 6 have advantage; Oath: accepts a duel' }),
+  'bear':        M(8, 13, 75, 8, 7, [2, 8], 5,  { n: 2, trait: 'Maul; Bloodied: advantage below half HP' }),
+  'spider':      M(8, 15, 60, 6, 7, [2, 8], 4,  { trait: 'Web (recharge 5-6); Brood once' }),
+  'serpent':     M(8, 15, 70, 8, 7, [2, 10], 4, { reach: 2, trait: 'Constrict; Gaze' }),
+  'crow':        M(8, 14, 55, 12, 7, [2, 8], 4, { trait: 'Eyes: blinds on a hit; Murder: a hundred crows around it' }),
+  'hound':       M(8, 15, 60, 10, 7, [2, 8], 4, { n: 2, trait: 'Knockdown; The Scent' }),
+  'giant':       M(8, 15, 90, 8, 7, [3, 8], 4,  { reach: 2, trait: 'Stomp (recharge 5-6); Too Big for doors' }),
+  'wolf':        M(8, 14, 60, 10, 7, [2, 8], 4, { n: 2, trait: 'Knockdown; Howl: two dire wolves once' }),
+  'toad':        M(8, 13, 75, 8, 7, [2, 8], 4,  { reach: 3, trait: 'Tongue pulls and grapples; Swallow' }),
+  'owlbear':     M(8, 14, 75, 8, 7, [2, 8], 5,  { n: 2, trait: 'Hug; Screech once' }),
+  'stag':        M(8, 15, 65, 12, 7, [2, 10], 4, { trait: 'Untouchable; Crown of Light once' }),
+  'moth':        M(8, 14, 55, 12, 7, [2, 8], 4, { n: 2, trait: 'Dust (recharge 5-6); Drawn to Light' }),
+  'eel':         M(8, 14, 65, 12, 7, [2, 8], 4, {
+                   plus: [1, 8], trait: 'Slippery: cannot be grappled or restrained. Swims through stone as through water',
+                   burst: { name: 'Discharge', recharge: 5, radius: 2, save: 'dex', dc: 14, dice: [4, 8] } }),
+  'shepherd':    M(8, 14, 60, 6, 7, [2, 6], 4,  { n: 2, trait: 'Herd; Call the Flock once' }),
+  'abbot':       M(8, 16, 60, 6, 7, [2, 8], 4,  { reach: 2, trait: 'Sermon; Faithful: allies heal 5 a turn' }),
+};
+const beast = kind => BESTIARY[String(kind || '').toLowerCase()] || BESTIARY.goblin;
+
+function makeFoe(kind, stats, name) {
+  return { id: 0, n: 0, kind, name, at: null,
+           hp: stats.hp, max: stats.hp, ac: stats.ac, speed: stats.speed,
+           hit: stats.hit, dice: stats.dice, bonus: stats.bonus, swings: stats.n,
+           reach: stats.reach, plus: stats.plus || null, burst: stats.burst || null,
+           flees: !!stats.flees, threat: stats.threat, boss: !!stats.boss,
+           trait: stats.trait || '', wants: stats.wants || '',
+           fleeing: false, dead: false, gone: false, cond: {} };
+}
+
+/* The Threat budget, rules/07-monsters.md: warm-up 1 x players, standard 2x,
+   hard 3x, finale 4x with the boss counting 8. Built from this campaign's own
+   minions, an elite-ish standard for every four Threat and minions to fill,
+   because mixing beats matching. Capped at seven bodies so a turn stays quick. */
+function buildFoes(size) {
+  const players = S.chars.filter(c => !c.dead).length || 1;
+  let left = ({ warmup: 1, standard: 2, hard: 3, finale: 4 })[size] * players;
+  const kinds = ((ROLL && ROLL.minions) || ['Goblin']).filter(k => BESTIARY[k.toLowerCase()]);
+  if (!kinds.length) kinds.push('Goblin');
+  const big = kinds.filter(k => beast(k).threat >= 2), small = kinds.filter(k => beast(k).threat === 1);
+  const out = [];
+
+  if (size === 'finale' && ROLL && ROLL.boss) {
+    const b = { ...(BOSSES[String(ROLL.boss.creature).toLowerCase()] || BOSSES.troll), boss: true,
+                wants: ROLL.boss.wants };
+    out.push(makeFoe(ROLL.boss.creature, b, ROLL.boss.name));
+    left -= 8;
+  }
+  const budget = left;
+  let i = 0;
+  while (left > 0 && out.length < 7) {
+    const wantBig = big.length && left >= 2
+      && (out.filter(f => !f.boss && f.threat >= 2).length < Math.floor(budget / 4) || !small.length);
+    const k = wantBig ? big[i % big.length] : small.length ? small[i % small.length] : big[0];
+    out.push(makeFoe(k, beast(k), k));
+    left -= beast(k).threat; i++;
+  }
+  /* "Cultist #1", "Cultist #2"; the boss keeps its name */
+  const count = {};
+  out.forEach((f, j) => {
+    f.id = j + 1;
+    if (f.boss) return;
+    count[f.kind] = (count[f.kind] || 0) + 1;
+    f.n = count[f.kind];
+    f.name = `${f.kind} #${f.n}`;
+  });
+  return out;
+}
+
+const PARTY_STARTS = ['D9', 'C11', 'E12', 'C7', 'E14'];
+const FOE_STARTS = ['L4', 'N7', 'P11', 'R14', 'T6', 'V10', 'X14', 'Z8'];
+const BOSS_START = 'X10';
+
+/* The nearest square to `sq` that a body can stand on. Fixed start squares
+   used to land people inside a map's walls. */
+function openNear(sq, taken) {
+  const [x0, y0] = toXY(sq);
+  for (let r = 0; r < 14; r++)
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = x0 + dx, y = y0 + dy;
+      if (!inBounds(x, y)) continue;
+      const s = sqName(x, y);
+      if (!isWall(s) && sceneCode(s) !== 'v' && !taken.includes(s)) return s;
+    }
+  return sq;
+}
 
 /* ---------- state ------------------------------------------------------ */
 let S = null, reach = {}, aiming = false;
+let ROLL = null;              /* this campaign's roll, from /api/campaign */
 
-function freshState(name, archetype, nFoes) {
-  const seats = PARTY.length ? PARTY : [{ name: name || archetype, archetype, kit: [] }];
+/* A new session: the party in town at the starting place, no fight. */
+function freshTown() {
+  const seats = PARTY.length ? PARTY : [{
+    name: document.getElementById('pname').value.trim() || 'Kira',
+    archetype: document.getElementById('pick').value, kit: [] }];
   return {
     chars: seats.map((p, i) => makeChar(p, i)),
-    active: 0, order: [], slot: 0,
-    archetype,                                   /* the seat the human picked */
-    foes: Array.from({ length: nFoes }, (_, i) => ({
-            id: i + 1, name: `Goblin #${i + 1}`, at: FOE_STARTS[i],
-            hp: GOBLIN.hp, max: GOBLIN.hp, fleeing: false, dead: false, gone: false })),
-    round: 0, turn: null, started: false, mode: null, acted: false, log: [], chat: []
+    active: 0, order: [], slot: 0, foes: [],
+    round: 0, turn: null, started: false, mode: null, acted: false,
+    where: 'town', place: (ROLL && ROLL.start) || null, fight: null, fights: [], notes: [],
+    session: { played: 0, last: Date.now(), rested: false, finaleDone: false },
+    log: [], chat: []
   };
+}
+
+/* A save from before Phase 2 is missing the session parts; fill them in. */
+function normalize(s) {
+  s.where = s.started ? 'fight' : 'town';
+  s.place = s.place || (ROLL && ROLL.start) || null;
+  s.fights = s.fights || []; s.notes = s.notes || [];
+  s.session = s.session || { played: 0, rested: false, finaleDone: false };
+  s.session.last = Date.now();
+  s.foes = (s.foes || []).map(f => f.ac !== undefined ? f
+    : { ...makeFoe('Goblin', beast('Goblin'), f.name), ...f, kind: 'Goblin', n: f.id });
+  for (const c of s.chars) { c.cond = c.cond || {}; c.sit = c.sit || {}; }
+  if (!s.chat) s.chat = [];
+  if (!s.log) s.log = [];
+  return s;
 }
 
 /* One seat at the table. Everything that used to hang off S.hero now hangs off
@@ -692,8 +885,10 @@ const initials = n => n.replace(/[^A-Za-z0-9 #]/g,'').split(/\s+/)
    resolved locally by runCommand(); anything else goes to Claude via askDM().  */
 function narrate(text)  { if (!S) return; S.chat.push({ who: 'dm',  text }); drawChat(); }
 function youSaid(text)  { if (!S) return;
-  // captured now, not at render time, or the whole backlog gets relabelled
-  S.chat.push({ who: 'you', name: me() ? me().name : 'You', text }); drawChat(); }
+  // captured now, not at render time, or the whole backlog gets relabelled;
+  // in town nobody has the turn, so it is the table talking
+  const name = S.started && me() ? me().name : WHO ? WHO.name : 'The table';
+  S.chat.push({ who: 'you', name, text }); drawChat(); }
 function sysLine(text)  { if (!S) return; S.chat.push({ who: 'sys', text }); drawChat(); }
 
 function drawChat() {
@@ -724,9 +919,19 @@ function runCommand(raw) {
     return false;
   }
 
-  /* Between fights there is nothing to command, but the table can still talk.
+  /* Town. Going somewhere on the map, and resting, are done here because they
+     are instant and cannot be misread; everything else is talk for the DM.
      This used to refuse every line once a fight ended, DM included. */
-  if (!S || !S.started) return false;
+  if (!S) return false;
+  if (!S.started) {
+    if (/\b(catch|get)\b[^.!?]*\bbreath\b/.test(t) || /^\s*(we\s+)?rest\b/.test(t)) {
+      catchBreath(true); return true;
+    }
+    const goes = /\b(go|goes|head|heads|walk|walks|return|returns|make for|back to|over to|into)\b/.test(t);
+    const p = goes && placeInText(t);
+    if (p) { goTo(p.name, true); return true; }
+    return false;
+  }
   if (S.turn !== 'hero') { sysLine('The enemy is moving.'); return true; }
 
   /* Naming a character who is not up used to act on whoever WAS up. Order is
@@ -778,17 +983,17 @@ function runCommand(raw) {
     return true;
   }
   if (wantsAttack) {
-    const num = (t.match(/#?\s?([1-4])\b/) || [])[1];
     const spell = attackSpell();
     if (spell) {
-      const foe = num && living().find(f => String(f.id) === num);
+      const foe = foeInText(t, living());
       useAbility(spell, foe ? foe.name : null);
       return true;
     }
     const targets = living().filter(inRange);
     if (!targets.length) { attack(); return true; }
-    const pick = num ? targets.find(f => String(f.id) === num) : targets[0];
-    if (!pick) { sysLine(`Goblin #${num} is not in reach.`); return true; }
+    const named = foeInText(t, living());
+    const pick = named ? targets.find(f => f === named) : targets[0];
+    if (!pick) { sysLine(`${named.name} is not in reach.`); return true; }
     doAttack(pick);
     return true;
   }
@@ -802,6 +1007,18 @@ function runCommand(raw) {
   return false;
 }
 
+/* "hit cultist 2", "attack the orc", "shoot #3": kind first, then number.
+   Null when the line names nobody in particular. */
+function foeInText(t, pool) {
+  const num = ((t.match(/#\s?(\d)\b/) || t.match(/\b(\d)\b/) || [])[1]);
+  let hit = pool.filter(f => t.includes(String(f.kind).toLowerCase())
+                          || t.includes(f.name.toLowerCase()));
+  if (!hit.length && !num) return null;
+  if (!hit.length) hit = pool;
+  if (num) hit = hit.filter(f => String(f.n || f.id) === num);
+  return hit[0] || null;
+}
+
 /* ---------- actions the DM asks for ------------------------------------
    The DM may PROPOSE an action; the engine decides whether it happens. Every
    proposal runs through the same checks a typed command does, so the DM can
@@ -809,7 +1026,26 @@ function runCommand(raw) {
    A refusal is reported plainly - the board is the authority, not the prose. */
 function applyActions(actions) {
   if (!Array.isArray(actions) || !actions.length) return;
-  if (!S || !S.started) return;
+  if (!S) return;
+
+  /* The ones that work in either mode, or only in town. The DM has already
+     narrated these, so none of them asks it to narrate again. */
+  for (const a of actions) {
+    if (a.kind === 'note') addNote(a.text);
+    else if (a.kind === 'rest') catchBreath(false);
+    else if (a.kind === 'go') {
+      if (S.started) sysLine('Not in the middle of a fight.');
+      else goTo(a.place, false);
+    } else if (a.kind === 'check' && !S.started) doCheck(a);
+    else if (a.kind === 'fight') {
+      if (S.started) continue;
+      /* after this reply has finished, so the fight's first DM turn is not
+         refused as "still thinking" */
+      setTimeout(() => startFight(a.size, a.place), 60);
+    }
+  }
+  if (!S.started) return;
+  actions = actions.filter(a => !['note', 'rest', 'go', 'fight'].includes(a.kind));
 
   for (const a of actions.slice(0, 3)) {      // a turn is not a whole sequence
     if (S.turn !== 'hero') { sysLine('The Dungeon Master tried to act out of turn.'); return; }
@@ -861,18 +1097,8 @@ function applyActions(actions) {
       useAbility(pick, a.target);
 
     } else if (a.kind === 'check') {
-      const abil = (a.stat || 'DEX').toUpperCase();
-      const mod = ({ STR: 'str', DEX: 'dex', CON: 'con',
-                     INT: 'int', WIS: 'wis', CHA: 'cha' })[abil];
-      const bonus = (ARCHETYPES[me().archetype] || {})[mod] || 0;
-      const r = d(20), total = r + bonus;
-      const dc = a.dc || 15;
-      say(`${me().name} — ${abil} check: ${r} + ${bonus} = <b>${total}</b> vs DC ${dc}. `
-        + (total >= dc ? '<span class="hit">It works.</span>'
-                       : '<span class="miss">It does not.</span>'), 'd');
-      record(`${me().name} tried something off the board: ${abil} check, `
-           + `${total} against DC ${dc} - ${total >= dc ? 'success' : 'failure'}.`);
-      S.acted = true; draw(); narrateOutcome(PHASE.RESOLVED);
+      /* in a fight only the character whose turn it is can try something */
+      doCheck({ ...a, who: me().name });
     } else if (a.kind === 'dash')     { dash(); }
     else if (a.kind === 'special')    { special(); }
     else if (a.kind === 'end_turn')   { endTurn(); }
@@ -923,7 +1149,10 @@ function terrainForDM() {
    geometry, so an illegal action is never offered rather than refused. */
 const PHASE = { AWAIT: 'awaiting', RESOLVED: 'resolved',
                 ENEMY: 'enemy', BETWEEN: 'between',
-                FREE: 'free' };          /* no fight running: just talk */
+                FREE: 'free',            /* town: answer whoever spoke */
+                OPENING: 'opening',      /* the hook, once per session */
+                TRAVEL: 'travel',        /* the party has just arrived somewhere */
+                AFTERMATH: 'aftermath' };/* a fight has just ended */
 
 let OUTCOME = [];                       /* what the engine did, in plain words */
 const record = line => OUTCOME.push(line);
@@ -932,7 +1161,7 @@ const record = line => OUTCOME.push(line);
    Narrating BEFORE the dice is how 'your bolt scorched him' appeared before
    any roll had happened. */
 function narrateOutcome(phase) {
-  if (!OUTCOME.length || !S || !S.started) { OUTCOME = []; return; }
+  if (!OUTCOME.length || !S) { OUTCOME = []; return; }
   const lines = OUTCOME.slice();
   OUTCOME = [];
   askDM('', { phase: phase || PHASE.RESOLVED, outcome: lines });
@@ -977,6 +1206,8 @@ async function askDM(raw, opts) {
   S.chat.push(thinking); drawChat();
 
   if (raw) youHeard = raw;
+  tick();
+  const b = beatNow();
   try {
     const r = await fetch('/api/dm', {
       method: 'POST',
@@ -989,7 +1220,14 @@ async function askDM(raw, opts) {
         outcome: (opts && opts.outcome) || [],
         /* the DM is told the map, so its description can never drift from it */
         terrain: terrainForDM(),
-        state: { ...S,
+        session: {
+          minutes: b.m, beat: b.beat, next: b.next, late: b.late,
+          fights: S.fights, rested: S.session.rested, notes: S.notes,
+          place: S.started ? null : S.place,
+          here: S.started ? [] : npcsAt(S.place).map(n => `${n.name} (${n.role.replace(/^The /, 'the ')})`)
+        },
+        /* the chat and the dice log are big and the server reads neither */
+        state: { ...S, chat: undefined, log: undefined,
           table: {
             round: S.round,
             order: S.order.map(o => o.k === 'pc'
@@ -1002,6 +1240,9 @@ async function askDM(raw, opts) {
               state: c.dead ? 'dead' : c.dying ? 'dying' : 'up',
               dmRun: !!c.dmRun,
               gender: c.gender || 'unstated',
+              species: c.species || '',
+              uses: c.uses === undefined ? 4 : c.uses,
+              conds: Object.keys(c.cond || {}).filter(k => c.cond[k]).join(' and '),
               carries: (c.kit || []).map(k => k.name).join(', ')
             }))
           },
@@ -1015,7 +1256,7 @@ async function askDM(raw, opts) {
           name: me() ? me().name : null,
           spellUses: me() ? (me().uses === undefined ? 4 : me().uses) : 4
         } },
-        history: S.chat.filter(m => m.who !== 'sys').slice(-8)
+        history: S.chat.filter(m => m.who !== 'sys' && !m.pending).slice(-16)
       })
     });
     const data = await r.json();
@@ -1024,6 +1265,10 @@ async function askDM(raw, opts) {
     /* the server would not spend past the line - ask the table, then send the same thing again */
     if (data.checkin) { CHECKIN = { info: data.checkin, raw, opts }; showCheckin(data.checkin); return; }
     narrate(data.text);
+    /* free before acting: an action the DM asked for is narrated by a second
+       call once the dice land, and that call used to be refused as "still
+       thinking" - so a DM-proposed attack or check was never described */
+    dmBusy = false;
     applyActions(data.actions);
     if (data.spend) drawSpend(data.spend);
     if (data.usage) {
@@ -1047,11 +1292,221 @@ function sendChat() {
   if (!text) return;
   // browsing the art does not need a fight
   if (showCommand(text)) { box.value = ''; return; }
-  if (!S) { sysLine('Start a fight first.'); box.value = ''; return; }
+  if (!S) { hint('Pick a campaign first.'); openPicker(); return; }
   youSaid(text.replace(/</g, '&lt;'));
   box.value = '';
   if (showCommand(text)) return;
   if (!runCommand(text)) askDM(text);
+}
+
+/* ---------- the session: town, the clock, and the way into a fight ------
+   Phase 2. A session is mostly town: the party is somewhere on the map,
+   talking, checking, deciding. A fight is an interruption that returns here. */
+
+const places = () => (ROLL && ROLL.places && ROLL.places.length) ? ROLL.places : autoPlaces();
+/* a roll without a drawn plan still gets a usable map: its sites in a row */
+function autoPlaces() {
+  const names = [((ROLL && ROLL.start) || 'The road in'),
+                 ...((ROLL && ROLL.sites) || []).map(s => s.name)];
+  return names.map((n, i) => ({ name: n, x: 6 + i * (88 / names.length), y: 32,
+                                w: 88 / names.length - 6, h: 36, site: i > 0 }));
+}
+const placeKey = s => String(s || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
+const findPlace = name => places().find(p => placeKey(p.name) === placeKey(name))
+  || places().find(p => placeKey(name) && (placeKey(p.name).includes(placeKey(name))
+                                         || placeKey(name).includes(placeKey(p.name))));
+/* the longest place name the line mentions, so "the gaoler's office" beats "the gaoler" */
+function placeInText(t) {
+  const plain = t.replace(/[^a-z0-9' ]/g, ' ');
+  return places().map(p => ({ p, k: p.name.toLowerCase().replace(/^the\s+/, '') }))
+    .filter(x => plain.includes(x.k) || plain.includes(x.k.replace(/'/g, '')))
+    .sort((a, b) => b.k.length - a.k.length).map(x => x.p)[0] || null;
+}
+const npcsAt = name => ((ROLL && ROLL.npcs) || []).filter(n => n.at && placeKey(n.at) === placeKey(name));
+const findChar = name => !name ? null : S.chars.find(c =>
+  c.name.toLowerCase() === String(name).toLowerCase()
+  || c.name.split(' ')[0].toLowerCase() === String(name).split(' ')[0].toLowerCase()) || null;
+
+/* The table goes somewhere. `narrate` is false when the DM asked for it, as
+   it has already described the walk. */
+function goTo(name, narrate) {
+  if (!S || S.started) return;
+  const p = findPlace(name);
+  if (!p) { sysLine(`There is no "${name}" on the map.`); return; }
+  if (p.name === S.place) { if (narrate) sysLine(`The party is already at ${p.name}.`); return; }
+  S.place = p.name;
+  draw();
+  if (narrate) askDM('', { phase: PHASE.TRAVEL, outcome: [`The party goes to ${p.name}.`] });
+}
+
+/* Catch Your Breath, rules/05-rests.md: once a session, half max HP back and
+   every per-rest ability refreshed. The party asks; the DM never offers. */
+function catchBreath(narrate) {
+  if (!S) return;
+  if (S.started) { sysLine('Not in the middle of a fight.'); return; }
+  if (S.session.rested) { sysLine('The party has already Caught Its Breath this session.'); return; }
+  S.session.rested = true;
+  const lines = [];
+  for (const c of S.chars) {
+    if (c.dead) continue;
+    const before = c.hp;
+    c.hp = Math.min(c.max, c.hp + Math.floor(c.max / 2));
+    c.uses = 4; c.usedSpecial = false; c.dying = false;
+    lines.push(`${c.name} recovers ${c.hp - before}, now ${c.hp}/${c.max}, Spell Uses back to 4.`);
+  }
+  say('<b>Catch Your Breath.</b> ' + lines.join(' '), '');
+  draw();
+  if (narrate) askDM('', { phase: PHASE.RESOLVED,
+                           outcome: ['The party stops for ten minutes to Catch Their Breath.', ...lines] });
+}
+
+function addNote(text) {
+  if (!S || !text) return;
+  S.notes.push(String(text).slice(0, 160));
+  if (S.notes.length > 30) S.notes.shift();
+  say(`Noted: ${esc(text)}`, 'd');
+}
+
+/* Any check, in either mode: d20 + ability + 2 if the skill is one of the
+   archetype's, against the DC the DM set. */
+function doCheck(a) {
+  const c = findChar(a.who) || (S.started ? me() : null) || S.chars.find(x => !x.dead) || S.chars[0];
+  if (S.started && S.acted) { sysLine(`${c.name} has already acted this turn.`); return; }
+  const abil = ABIL.includes(String(a.stat).toLowerCase()) ? String(a.stat).toLowerCase() : 'dex';
+  const skill = a.skill && sheetOf(c).skills.includes(a.skill) ? a.skill : null;
+  const bonus = checkBonus(c, abil, skill);
+  const e = effects(c);
+  const { roll, note } = d20(e.youAdv && !e.youDis, e.youDis && !e.youAdv);
+  const total = roll + bonus, dc = a.dc || 15, ok = total >= dc;
+  const what = `${abil.toUpperCase()}${a.skill ? ` (${a.skill})` : ''}`;
+  say(`${c.name} — ${what} check: ${roll}${note} ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = <b>${total}</b> vs DC ${dc}. `
+    + (ok ? '<span class="hit">Success.</span>' : '<span class="miss">Failure.</span>'), 'd');
+  record(`${c.name} made a ${what} check: ${total} against DC ${dc}, a ${ok ? 'success' : 'failure'}`
+       + `${roll === 20 ? ' (a natural 20)' : roll === 1 ? ' (a natural 1)' : ''}.`);
+  if (S.started) S.acted = true;
+  draw();
+  narrateOutcome(PHASE.RESOLVED);
+}
+
+/* ---------- the session clock ----------------------------------------------
+   Counts time the table is actually here: a minute is added only while
+   someone has touched the screen in the last ten, so a page left open
+   overnight does not end up at the landing. */
+let lastInput = Date.now();
+['keydown', 'pointerdown'].forEach(ev => document.addEventListener(ev, () => { lastInput = Date.now(); }));
+function tick() {
+  if (!S || !S.session) return;
+  const now = Date.now(), s = S.session;
+  if (s.last && now - lastInput < 10 * 60e3) s.played += Math.min(now - s.last, 60e3);
+  s.last = now;
+}
+setInterval(() => { tick(); drawClock(); }, 30e3);
+
+/* dm/one-shot-structure.md, minute by minute */
+const BEATS = [
+  [0,  'the hook',                           'scene one, the social scene',  'Hook'],
+  [10, 'scene one, social',                  'scene two, exploration',       'Scene one'],
+  [25, 'scene two, exploration',             'the complication fight',       'Scene two'],
+  [40, 'the complication, a standard fight', 'scene three, the turn',        'Complication'],
+  [50, 'scene three, the turn',              'the finale',                   'The turn'],
+  [65, 'the finale: the boss',               'the landing',                  'Finale'],
+  [85, 'the landing',                        null,                           'Landing'],
+];
+function beatNow() {
+  const m = S && S.session ? Math.floor(S.session.played / 60e3) : 0;
+  if (S && S.session && S.session.finaleDone)
+    return { m, beat: 'the landing (the finale is done)', next: null, late: false, short: 'Landing' };
+  let b = BEATS[0];
+  for (const x of BEATS) if (m >= x[0]) b = x;
+  return { m, beat: b[1], next: b[2], late: m >= 70, short: b[3] };
+}
+function drawClock() {
+  const el = document.getElementById('clockpill');
+  if (!el) return;
+  if (!S || !S.session) { el.textContent = '0:00'; return; }
+  const b = beatNow();
+  el.textContent = `${Math.floor(b.m / 60)}:${String(b.m % 60).padStart(2, '0')} · ${b.short}`;
+  el.className = 'pill' + (b.late ? ' warn' : '');
+}
+
+/* ---------- the town map ---------------------------------------------------- */
+function drawTown() {
+  const el = document.getElementById('town');
+  /* where, not started: the finished fight stays on screen for a moment */
+  const town = !S || S.where !== 'fight';
+  el.className = 'townwrap' + (town ? ' on' : '');
+  document.getElementById('boardwrap').style.display = town ? 'none' : '';
+  document.getElementById('legend').style.display = town ? 'none' : '';
+  if (!town) return;
+  if (!S) { el.innerHTML = '<p class="townnote">Pick a campaign to begin.</p>'; return; }
+
+  const ps = places();
+  const plots = ps.map(p => `<rect class="plot ${p.site ? 'site' : ''} ${p.name === S.place ? 'here' : ''}"
+      x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="1.2"/>`).join('');
+  const pins = ps.map((p, i) => {
+    const here = p.name === S.place;
+    const who = npcsAt(p.name).map(n => n.role.replace(/^The /, ''));
+    return `<button class="pin ${here ? 'here' : ''}" data-i="${i}"
+        style="left:${p.x + p.w / 2}%;top:${p.y + p.h / 2}%" title="${esc(p.blurb || p.name)}">
+        ${here ? '<span class="tag">the party is here</span>' : ''}${esc(p.name)}
+        ${who.length ? `<small>${esc(who.join(', '))}</small>` : ''}</button>`;
+  }).join('');
+  el.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${plots}</svg>`
+    + pins + `<span class="townnote">${esc((ROLL && ROLL.setting) || '')}`
+    + ` · click a place to go there · dashed outlines are where fights happen</span>`;
+  el.querySelectorAll('.pin').forEach(b => b.onclick = () => {
+    if (dmBusy) { sysLine('The Dungeon Master is still speaking.'); return; }
+    const p = ps[+b.dataset.i];
+    if (p.name === S.place) return;
+    youSaid(`We go to ${esc(p.name)}.`);
+    goTo(p.name, true);
+  });
+}
+
+/* ---------- into a fight ----------------------------------------------------
+   The DM asks with [[fight: standard]] or [[fight: finale at The gatehouse]],
+   or someone presses Start fight. The place decides the map: a fight site
+   has its own painted battle map and mask; anywhere else uses the plain grid. */
+function startFight(size, placeName) {
+  if (!S) return;
+  if (S.started) { sysLine('A fight is already running.'); return; }
+  const p = placeName && findPlace(placeName);
+  if (p) S.place = p.name;
+  const map = ART.find(a => a.kind === 'battle_map' && a.terrain && placeKey(a.name) === placeKey(S.place));
+  SCENE = map ? { asset: map, terrain: map.terrain } : null;
+
+  S.fight = { size, place: S.place || 'here' };
+  S.foes = buildFoes(size);
+  const taken = [];
+  S.chars.forEach((c, i) => {
+    c.at = openNear(PARTY_STARTS[i] || 'D10', taken); taken.push(c.at);
+    c.moved = 0; c.dashed = false; c.raging = false; c.smiting = false;
+    c.saves = c.fails = 0; c.cond = {}; c.sit = {};
+  });
+  S.foes.forEach((f, i) => {
+    f.at = openNear(f.boss ? BOSS_START : FOE_STARTS[i % FOE_STARTS.length], taken);
+    taken.push(f.at);
+  });
+  S.started = true; S.where = 'fight'; S.round = 1; S.acted = false; S.log = [];
+  markSeats();
+
+  /* Initiative: every character rolls, the monsters roll ONCE between them,
+     per the rules. The order is then fixed for the fight and the app keeps
+     it, so nobody has to remember whose go it is. */
+  const rolls = S.chars.map((c, i) => ({
+    k: 'pc', i, init: d(20) + (ARCHETYPES[c.archetype] || ARCHETYPES.Vanguard).dex }));
+  S.order = [...rolls, { k: 'foes', init: d(20) + 2 }]
+              .sort((a, b) => b.init - a.init || (a.k === 'pc' ? -1 : 1));
+  S.slot = 0;
+
+  say(`<b>${{ warmup: 'A warm-up', standard: 'A fight', hard: 'A hard fight', finale: 'The finale' }[size]}</b>`
+    + ` at ${S.fight.place}: ` + S.foes.map(f => `${f.name} at ${f.at}`).join(', ') + '.');
+  say('Initiative — ' + S.order.map(o =>
+        `${o.k === 'pc' ? S.chars[o.i].name : 'the enemy'} ${o.init}`).join(', ')
+      + '. One roll for all the monsters.', 'd');
+  sysLine(`The fight is on${map ? `, on the map of ${map.name}` : ''}. Turns go in the order just rolled.`);
+  reach = {}; aiming = false;
+  beginSlot(true);
 }
 
 /* ---------- rendering -------------------------------------------------- */
@@ -1060,7 +1515,7 @@ function sendChat() {
 /* "G2" reads fine for interchangeable goblins, but a named antagonist is not a
    G-number - the boss was showing up on the board as "G1". */
 const tagFor = (who, kind) =>
-  kind === 'foe' && /^goblin/i.test(who.name) ? 'G' + who.id : initials(who.name);
+  kind === 'foe' && !who.boss && who.n ? initials(String(who.kind)) + who.n : initials(who.name);
 
 function token(who, kind) {
   const dead = who.dead && kind === 'foe';
@@ -1113,7 +1568,6 @@ async function loadArt() {
     window.CAMPAIGN = doc.campaign || {};
     partyOptions();
   } catch (e) { /* no art published yet - that is fine */ }
-  sceneOptions();
   drawCast();
 }
 
@@ -1160,6 +1614,22 @@ function castList() {
   return out;
 }
 
+/* Town: the party, then whoever is here, then everyone else and where they
+   are. Never the boss: the table meets it at the finale. */
+function townCast() {
+  const out = S.chars.map(c => ({ cls: 'hero', label: c.name,
+    sub: c.dead ? 'dead' : `${c.hp}/${c.max}`,
+    art: findArt(c.name, 'portrait') || findArt(c.name, 'token') }));
+  const npcs = (ROLL && ROLL.npcs) || [];
+  const here = npcsAt(S.place);
+  for (const n of [...here, ...npcs.filter(x => !here.includes(x))])
+    out.push({ cls: here.includes(n) ? 'foe' : '', label: n.name,
+               sub: here.includes(n) ? `${n.role.replace(/^The /, 'the ')} · here`
+                  : `${n.role.replace(/^The /, 'the ')} · ${n.at || 'not here yet'}`,
+               art: findArt(n.role, 'portrait') });
+  return out;
+}
+
 function drawCast() {
   const el = document.getElementById('caststrip');
   if (!el) return;
@@ -1169,11 +1639,11 @@ function drawCast() {
     return;
   }
   const fighting = S && S.started;
-  const rows = fighting ? castList()
+  const rows = fighting ? castList() : S ? townCast()
     : ART.filter(a => a.kind.endsWith('portrait') || a.kind === 'battle_map')
          .map(a => ({ cls: '', label: a.name, sub: a.kind.replace(/_/g, ' '), art: a }));
 
-  el.innerHTML = `<h2>${fighting ? 'In the fight' : 'Cast'}</h2>` + rows.map((r, i) => {
+  el.innerHTML = `<h2>${fighting ? 'In the fight' : S ? 'The party and the people' : 'Cast'}</h2>` + rows.map((r, i) => {
     const src = r.art ? `assets/${r.art.thumb}` : '';
     return `<div class="castcard ${r.cls}" data-i="${i}" title="${r.label}">
       ${src ? `<img src="${src}" alt="${r.label}" loading="lazy">`
@@ -1182,7 +1652,7 @@ function drawCast() {
       ${r.sub ? `<div class="sub">${r.sub}</div>` : ''}
     </div>`;
   }).join('')
-  + (fighting ? '' : '<p class="castnote">Start a fight to see who is on the board.</p>');
+  + (fighting || S ? '' : '<p class="castnote">Pick a campaign to begin.</p>');
 
   el.querySelectorAll('.castcard').forEach(c => c.onclick = () => {
     const r = rows[+c.dataset.i];
@@ -1320,63 +1790,6 @@ function aimDist() {
   return ls.length ? Math.min(...ls.map(f => cheb(me().at, f.at))) : null;
 }
 
-/* ---------- scenes: a real battle map under a real fight --------------- */
-const SCENE_STARTS = ['D9', 'C11', 'E12'];        /* the party, bottom left */
-const BOSS_START   = 'X10';                       /* the antagonist, far side */
-
-function sceneOptions() {
-  const sel = document.getElementById('scene');
-  if (!sel) return;
-  const maps = ART.filter(a => a.kind === 'battle_map' && a.terrain);
-  sel.innerHTML = '<option value="">No map — the demo\'s own terrain</option>'
-    + maps.map((a, i) => `<option value="${i}">${a.name}</option>`).join('');
-  sel.disabled = !maps.length;
-}
-
-/* Loads the map, its mask, the party and the antagonist in one go. The two
-   party members who are not you stand on the board but do not take turns yet -
-   the engine is still one hero versus foes. They are here so the scene can be
-   looked at honestly, not because multi-player combat is built. */
-function loadScene() {
-  const sel = document.getElementById('scene');
-  const maps = ART.filter(a => a.kind === 'battle_map' && a.terrain);
-  const pick = sel.value === '' ? null : maps[+sel.value];
-
-  if (!pick) { SCENE = null; draw(); hint('Back to the demo terrain.'); return; }
-  SCENE = { asset: pick, terrain: pick.terrain };
-
-  const players = ART.filter(a => a.kind === 'player_token');
-  const boss = ART.find(a => a.kind === 'boss_token');
-
-  document.getElementById('nfoes').value = '1';
-  start();                                    // rolls initiative for everyone
-
-  S.chars.forEach((c, i) => { c.at = SCENE_STARTS[i] || c.at; });
-  if (boss) {
-    S.foes[0].name = boss.name;
-    S.foes[0].at = BOSS_START;
-    S.foes[0].art = boss;
-    S.foes[0].hp = S.foes[0].max = 48;            // a boss, not a goblin
-  }
-
-  // start() announced a goblin fight; this is not that fight
-  S.log = []; S.chat = [];
-  document.getElementById('log').innerHTML = '';
-
-  draw();
-  hint(`${pick.name} — the party and ${S.foes[0].name}.`);
-  say(`<b>${pick.name}.</b> `
-    + S.chars.map(c => `${c.name.split(' ')[0]} at ${c.at}`).join(', ')
-    + `. <b>${S.foes[0].name}</b> at ${S.foes[0].at}.`);
-  say('Initiative — ' + S.order.map(o =>
-        `${o.k === 'pc' ? S.chars[o.i].name.split(' ')[0] : 'the enemy'} ${o.init}`
-      ).join(', '), 'd');
-  beginSlot(true);
-  sysLine(`Scene loaded. The grid reads this map's own mask, so the walls and `
-        + `rough ground match the picture. All three characters take their own `
-        + `turns, in the order just rolled.`);
-}
-
 function draw() {
   let html = '<tr class="head"><th class="rowh"></th>';
   for (let x = 0; x < COLS; x++) html += `<th>${COL_NAMES[x]}</th>`;
@@ -1414,7 +1827,7 @@ function draw() {
   b.innerHTML = html;
   b.querySelectorAll('td').forEach(td => td.addEventListener('click', () => clickSquare(td.dataset.sq)));
   drawHero(); drawConds(); drawAbilities(); drawEnemies(); drawSave();
-  drawHeader(); drawChat();
+  drawHeader(); drawChat(); drawTown(); drawClock();
   drawCast(); syncButtons();
   queueSave();
 }
@@ -1422,17 +1835,36 @@ function draw() {
 function drawHeader() {
   const rp = document.getElementById('roundpill'), tp = document.getElementById('turnpill');
   const fp = document.getElementById('foespill');
-  rp.textContent = S && S.round ? `Round ${S.round}` : 'no fight yet';
+  rp.textContent = S && S.started ? `Round ${S.round}` : S && S.place ? S.place : 'no campaign';
   if (S && S.started) {
     tp.style.display = ''; tp.className = 'pill turn';
-    tp.textContent = S.turn === 'hero' ? `${me().name}'s turn` : "goblins' turn";
+    tp.textContent = S.turn === 'hero' ? `${me().name}'s turn` : "the enemy's turn";
   } else tp.style.display = 'none';
+  fp.style.display = S && S.started ? '' : 'none';
   fp.textContent = S ? `${living().length} standing · ${S.foes.filter(f=>f.dead).length} dead · ${S.foes.filter(f=>f.gone).length} fled` : '—';
+}
+
+/* Town: no one has the turn, so the panel shows the whole party, and the
+   one rest of the session. */
+function drawParty(el) {
+  el.innerHTML = '<div class="party">' + S.chars.map(c => {
+    const pct = Math.max(0, c.hp / c.max * 100);
+    return `<div class="who"><div class="stat"><b>${esc(c.name)}</b><span>${c.archetype}</span></div>
+      <div class="bar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>
+      <div class="stat"><span>${c.dead ? 'dead' : `${c.hp} / ${c.max} HP`}</span>
+        <span>${c.uses === undefined ? 4 : c.uses} Spell Uses</span></div></div>`;
+  }).join('') + '</div>'
+  + `<div class="row" style="margin-top:8px"><button id="bRest" ${S.session.rested ? 'disabled' : ''}
+       title="Once per session: half your hit points back, and every per-rest ability">
+       ${S.session.rested ? 'Breath caught this session' : 'Catch Your Breath'}</button></div>`;
+  const b = document.getElementById('bRest');
+  if (b) b.onclick = () => { youSaid('We stop to Catch Our Breath.'); catchBreath(true); };
 }
 
 function drawHero() {
   const el = document.getElementById('hero');
   if (!S) { el.innerHTML = '<p style="color:var(--muted);margin:0;font-size:.8rem">No character yet.</p>'; return; }
+  if (!S.started) { drawParty(el); return; }
   const a = ARCHETYPES[me().archetype], h = me(), e = effects();
   const pct = Math.max(0, h.hp / h.max * 100);
   const notes = [];
@@ -1558,7 +1990,8 @@ function useAbility(k, named) {
       return;
     }
     me().uses -= 1;
-    const sv = d(20) + 2;                       /* monsters save at a flat +2 */
+    /* monsters save at a flat +2, something tough at +5 (rules/07-monsters.md) */
+    const sv = d(20) + ((t.boss || (t.threat || 1) >= 4) ? 5 : 2);
     const made = sv >= dc;
 
     if (dice[0]) {
@@ -1627,7 +2060,7 @@ function toggleCond(c) {
 
 function drawEnemies() {
   const el = document.getElementById('enemies');
-  if (!S) { el.innerHTML = '<p style="color:var(--muted);margin:0;font-size:.8rem">None.</p>'; return; }
+  if (!S || !S.started) { el.innerHTML = '<p style="color:var(--muted);margin:0;font-size:.8rem">No fight running.</p>'; return; }
   el.innerHTML = S.foes.map(f => {
     const out = f.dead || f.gone;
     const pct = Math.max(0, f.hp / f.max * 100);
@@ -1644,12 +2077,17 @@ function drawEnemies() {
 
 function drawSave() {
   const el = document.getElementById('saveline');
-  if (!S || !S.started) { el.textContent = '—'; return; }
+  if (!S) { el.textContent = '—'; return; }
+  if (!S.started) {
+    el.textContent = `In town at ${S.place || 'the start'} — ${S.fights.length} fight`
+      + `${S.fights.length === 1 ? '' : 's'} so far, ${beatNow().m} minutes played`;
+    return;
+  }
   const parts = [`${me().name} ${me().at} (${me().hp} hp)`];
   for (const f of S.foes)
     parts.push(`${f.name} ${f.gone ? 'fled' : f.dead ? 'dead' : `${f.at} (${f.hp} hp)`}`);
   el.textContent = parts.join(', ') +
-    ` — round ${S.round}, ${S.turn === 'hero' ? me().name + "'s" : "goblins'"} turn`;
+    ` — round ${S.round}, ${S.turn === 'hero' ? me().name + "'s" : "the enemy's"} turn`;
 }
 
 const budget = () => effects().speed0 ? 0 : ARCHETYPES[me().archetype].speed * (me().dashed ? 2 : 1);
@@ -1690,32 +2128,6 @@ function clickSquare(sq) {
     return;
   }
   if (S.mode === 'move' && reach[sq] !== undefined) moveTo(sq);
-}
-
-/* ---------- turn flow -------------------------------------------------- */
-function start() {
-  const name = document.getElementById('pname').value.trim();
-  const n = parseInt(document.getElementById('nfoes').value, 10);
-  S = freshState(name, document.getElementById('pick').value, n);
-  S.started = true; S.round = 1; S.log = [];
-  markSeats();
-
-  /* Initiative: every character rolls, the monsters roll ONCE between them,
-     per the rules. The order is then fixed for the fight and the app keeps
-     it, so nobody has to remember whose go it is. */
-  const rolls = S.chars.map((c, i) => ({
-    k: 'pc', i, init: d(20) + (ARCHETYPES[c.archetype] || ARCHETYPES.Vanguard).dex }));
-  const foeInit = d(20) + 2;
-  S.order = [...rolls, { k: 'foes', init: foeInit }]
-              .sort((a, b) => b.init - a.init || (a.k === 'pc' ? -1 : 1));
-  S.slot = 0;
-
-  say(`<b>${n === 1 ? 'A goblin' : n + ' goblins'}</b> at ${S.foes.map(f => f.at).join(', ')}.`);
-  say('Initiative — ' + S.order.map(o =>
-        `${o.k === 'pc' ? S.chars[o.i].name : 'the enemy'} ${o.init}`).join(', ')
-      + '. One roll for all the monsters.', 'd');
-  reach = {}; aiming = false;
-  beginSlot(true);
 }
 
 /* ---------- the round --------------------------------------------------
@@ -1794,7 +2206,7 @@ function attack() {
   if (targets.length === 1) { doAttack(targets[0]); return; }
   aiming = true; reach = {}; S.mode = null;
   draw();
-  hint('Click the goblin you want to attack.');
+  hint('Click the enemy you want to attack.');
 }
 
 function doAttack(target) {
@@ -1818,7 +2230,7 @@ function swing(w, target, n, of) {
   const a = ARCHETYPES[me().archetype];
   const label = of > 1 ? `${w.n} (${n} of ${of})` : w.n;
   const cover = hasCover(me().at, target.at);
-  const ac = GOBLIN.ac + (cover ? 2 : 0);
+  const ac = (target.ac || 15) + (cover ? 2 : 0);
 
   if (w.save) {                       /* Vicious Mockery — a save, not an attack roll */
     const sv = d(20) + 2;
@@ -1826,6 +2238,12 @@ function swing(w, target, n, of) {
     const dmg = rollDice(w.dice);
     target.hp -= dmg;
     say(`<b>${label}</b> at ${target.name} — it fails (${sv} vs DC ${w.save}). <span class="hit">${dmg} psychic.</span>`, '');
+    record(`${me().name} used ${w.n} on ${target.name}, which took ${dmg}.`);
+    if (target.hp <= 0) {             /* this path never killed anything before */
+      target.hp = 0; target.dead = true;
+      record(`${target.name} is down.`);
+      say(`<b>${target.name} drops.</b>`, 'crit');
+    }
     return;
   }
 
@@ -1861,9 +2279,12 @@ function swing(w, target, n, of) {
   }
 }
 
+/* Only the ones whose WANTS say so run when hurt: a goblin bolts, a cultist
+   finishes the ritual, the boss never leaves its lair. */
+const wantsOut = f => f.flees && !f.fleeing && f.hp <= Math.max(2, Math.floor(f.max / 4));
 function checkFoes() {
   for (const f of living()) {
-    if (f.hp <= 2 && !f.fleeing) {
+    if (wantsOut(f)) {
       f.fleeing = true;
       say(`${f.name} is badly hurt. <b>It wants to run.</b>`, 'd');
     }
@@ -1928,16 +2349,37 @@ function foeTurn() {
     const shaken = !!f.cond.frightened;
     f.cond = {};
     const e = effects(mark);
-    if (f.hp <= 2 && !f.fleeing) {
+    if (wantsOut(f)) {
       f.fleeing = true;
       say(`${f.name} has had enough. <b>It wants out.</b>`, 'd');
     }
     const blocked = onBoard().filter(o => o !== f && !o.dead).map(o => o.at)
                   .concat(standing().map(c => c.at));
     const dist = cheb(f.at, mark.at);
+    const speed = f.speed || 6, range = f.reach || 1;
+
+    /* a burst (the Eel's Discharge) instead of attacking, when it is charged
+       and it would catch someone: ready the first time, then on a d6 of 5-6 */
+    if (f.burst && !f.fleeing) {
+      const caught = standing().filter(c => cheb(f.at, c.at) <= f.burst.radius);
+      const ready = !f.burstUsed || d(6) >= f.burst.recharge;
+      if (caught.length && ready) {
+        f.burstUsed = true;
+        const total = rollDice(f.burst.dice);
+        say(`<b>${f.name} — ${f.burst.name}!</b> ${f.burst.save.toUpperCase()} save DC ${f.burst.dc}.`, 'crit');
+        for (const c of caught) {
+          const sv = d(20) + saveBonus(c, f.burst.save);
+          const dmg = sv >= f.burst.dc ? Math.floor(total / 2) : total;
+          say(`${c.name} saves ${sv}: ${sv >= f.burst.dc ? 'half' : '<span class="hit">fails</span>'}, ${dmg} damage.`, '');
+          record(`${f.name}'s ${f.burst.name} caught ${c.name}: ${sv >= f.burst.dc ? 'saved, half' : 'failed the save'}, ${dmg} damage.`);
+          if (hurt(c, dmg)) { endFight(true); return; }
+        }
+        continue;
+      }
+    }
 
     if (f.fleeing) {
-      const opts = reachable(f.at, GOBLIN.speed, blocked);
+      const opts = reachable(f.at, speed, blocked);
       let best = f.at, bestD = dist;
       for (const sq in opts) { const dd = cheb(sq, mark.at); if (dd > bestD) { bestD = dd; best = sq; } }
       if (best !== f.at) { say(`${f.name} breaks off — ${f.at} → <b>${best}</b>. Nimble Escape.`, 'd'); f.at = best; }
@@ -1947,47 +2389,62 @@ function foeTurn() {
       continue;
     }
 
-    if (dist > 1 && !held && !shaken) {
-      const opts = reachable(f.at, GOBLIN.speed, blocked);
+    if (dist > range && !held && !shaken) {
+      const opts = reachable(f.at, speed, blocked);
       let best = f.at, bestD = dist;
-      for (const sq in opts) { const dd = cheb(sq, mark.at); if (dd < bestD) { bestD = dd; best = sq; } }
+      /* close until in reach, and no further: an archer does not walk up to you */
+      for (const sq in opts) {
+        const dd = cheb(sq, mark.at);
+        if (bestD > range ? dd < bestD : (dd <= range && opts[sq] < (opts[best] ?? 99))) { bestD = dd; best = sq; }
+      }
       if (best !== f.at) { say(`${f.name} comes ${f.at} → <b>${best}</b>.`, 'd'); f.at = best; }
     }
 
-    if (cheb(f.at, mark.at) <= 1 && !mark.dying) {
+    const swings = f.swings || 1;
+    for (let k = 0; k < swings; k++) {
+      if (mark.dying || mark.dead || cheb(f.at, mark.at) > range) break;
       const a = ARCHETYPES[mark.archetype];
       const cover = hasCover(f.at, mark.at);
       const ac = a.ac + (cover ? 2 : 0);
       const fAdv = e.themAdv && !e.themDis, fDis = e.themDis && !e.themAdv;
       const { roll, note } = d20(fAdv, fDis);
-      const total = roll + GOBLIN.hit;
-      if (roll === 1) say(`${f.name} swings — natural 1. Miss.`, 'miss');
+      const hit = f.hit ?? 4, dice = f.dice || [1, 6], bonus = f.bonus ?? 2;
+      const total = roll + hit;
+      const label = swings > 1 ? `${f.name} (${k + 1} of ${swings})` : f.name;
+      if (roll === 1) say(`${label} swings — natural 1. Miss.`, 'miss');
       else if (roll !== 20 && total < ac) {
-        say(`${f.name} swings — ${total}${note} vs AC ${ac}. <span class="miss">Miss.</span>`, '');
+        say(`${label} swings — ${total}${note} vs AC ${ac}. <span class="miss">Miss.</span>`, '');
         record(`${f.name} swung at ${mark.name} and missed.`);
       }
       else {
-        let dmg = roll === 20 ? rollDice(GOBLIN.dice) + rollDice(GOBLIN.dice) + GOBLIN.bonus
-                              : rollDice(GOBLIN.dice) + GOBLIN.bonus;
+        let dmg = roll === 20 ? rollDice(dice) + rollDice(dice) + bonus : rollDice(dice) + bonus;
+        if (f.plus) dmg += rollDice(f.plus);
         let tail = '';
         if (mark.raging) { dmg = Math.floor(dmg / 2); tail = ' (halved by Rage)'; }
-        mark.hp -= dmg;
-        say(`${f.name} — ${roll === 20 ? '<span class="crit">natural 20!</span>' : `${total}${note} vs AC ${ac}`}. ` +
-            `<span class="hit">${dmg} damage</span>${tail}. ${mark.name} is on ${Math.max(0, mark.hp)}.`, '');
+        say(`${label} — ${roll === 20 ? '<span class="crit">natural 20!</span>' : `${total}${note} vs AC ${ac}`}. ` +
+            `<span class="hit">${dmg} damage</span>${tail}. ${mark.name} is on ${Math.max(0, mark.hp - dmg)}.`, '');
         record(`${f.name} hit ${mark.name} for ${dmg}${roll === 20 ? ' on a critical' : ''}. `
-             + `${mark.name} is on ${Math.max(0, mark.hp)} of ${mark.max}.`);
-        if (mark.hp <= 0) {
-          mark.hp = 0; mark.dying = true;
-          say(`<b>${mark.name} drops to 0 and is dying.</b>`, 'crit');
-          if (partyDown()) { endFight(true); return; }
-          narrate(`${mark.name} goes down. Roll a death save at the start of each turn.`);
-        }
+             + `${mark.name} is on ${Math.max(0, mark.hp - dmg)} of ${mark.max}.`);
+        if (hurt(mark, dmg)) { endFight(true); return; }
       }
     }
   }
   if (!living().length) { endFight(); return; }
   narrateOutcome(PHASE.ENEMY);
   nextSlot();
+}
+
+/* Damage to a character. True when that leaves the whole party down. */
+function hurt(c, dmg) {
+  c.hp -= dmg;
+  if (c.hp > 0) return false;
+  c.hp = 0;
+  if (!c.dying) {
+    c.dying = true;
+    say(`<b>${c.name} drops to 0 and is dying.</b>`, 'crit');
+    record(`${c.name} goes down, dying.`);
+  }
+  return partyDown();
 }
 
 function deathSave() {
@@ -2017,28 +2474,46 @@ function deathSave() {
 /* everyone dead or on the floor - the only way the party loses */
 const partyDown = () => S.chars.every(c => c.dead || c.dying);
 
+/* The fight ends, and the board goes back to the town map. Julian's rule
+   (2026-10-14): after a fight the table must see where it can go next, not a
+   dead grid. The DM narrates the aftermath, folding in the last blow. */
 function endFight(lost) {
   S.started = false;
   reach = {}; aiming = false;
+  clearTimeout(foeTimer);
+  const lines = OUTCOME.splice(0);              // the killing blow, still un-narrated
+  const ran = S.foes.filter(f => f.gone).length, killed = S.foes.filter(f => f.dead).length;
+  const fight = S.fight || { size: 'standard', place: S.place || 'here' };
+
   if (lost) {
     say(`<b>The party is down.</b>`, 'crit');
-    narrate('The last of you goes down, and the noise stops. Whatever happens ' +
-            'next is not up to any of you.');
-    draw(); hint('The party fell. Start another fight.');
-    return;
+    lines.push('The whole party went down and the fight is lost. Everyone still alive '
+             + 'comes round later on 1 hit point, wherever the enemy chose to leave them.');
+  } else {
+    say(`<b>The fight is over.</b> ${killed} down${ran ? `, ${ran} ran` : ''}.`, 'crit');
+    lines.push(`The fight is won: ${killed} dead${ran ? `, ${ran} fled` : ''}.`);
   }
-  const ran = S.foes.filter(f => f.gone).length, killed = S.foes.filter(f => f.dead).length;
-  say(`<b>The fight is over.</b> ${killed} down${ran ? `, ${ran} ran` : ''}.`, 'crit');
   // house rule: the fight ending brings everyone still breathing back up
   for (const c of S.chars) {
     if (c.dead) continue;
     if (c.dying || c.hp <= 0) {
       c.dying = false; c.hp = 1; c.saves = c.fails = 0;
       say(`House rule: the fight has ended, so ${c.name} wakes at <b>1 hit point</b>.`, '');
+      lines.push(`${c.name} comes round on 1 hit point.`);
     }
   }
-  narrate(`It is over. ${killed} dead${ran ? `, ${ran} gone into the dark` : ''}. The room goes quiet.`);
-  draw(); hint('Fight over. Talk to the Dungeon Master, or start another fight.');
+  S.fights.push({ size: fight.size, place: fight.place, won: !lost });
+  if (!lost && fight.size === 'finale') S.session.finaleDone = true;
+  draw();
+  hint(lost ? 'The party fell.' : 'Fight over.');
+
+  setTimeout(() => {
+    if (!S || S.started) return;
+    S.where = 'town'; S.fight = null; SCENE = null; S.turn = null;
+    draw();
+    hint('Back on the map. Talk to the Dungeon Master, or click a place to go there.');
+    askDM('', { phase: PHASE.AFTERMATH, outcome: lines });
+  }, 1800);
 }
 
 /* ---------- campaigns, save and resume -----------------------------------
@@ -2086,23 +2561,35 @@ async function load() {
     const r = await fetch(`/api/save?campaign=${CAMPAIGN.id}`, { cache: 'no-store' });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || r.status);
-    if (!data.state) { S = null; draw(); hint(`${CAMPAIGN.name}: nothing played yet. Start a fight.`); return; }
-    S = data.state; reach = {}; aiming = false;
-    for (const c of S.chars) { c.cond = c.cond || {}; c.sit = c.sit || {}; }
-    if (!S.chat) S.chat = [];
+    if (!data.state) { newSession(); return; }
+    S = normalize(data.state); reach = {}; aiming = false;
+    markSeats();
     /* "Resumed" used to be written into the save itself, so every reopen
        brought back all the earlier ones. It is shown, never saved, and any
        left over from before are dropped. */
-    S.log = (S.log || []).filter(e => !/^Resumed — round/.test(e.html));
-    const asset = data.scene && ART.find(a => a.kind === 'battle_map' && a.name === data.scene);
+    S.log = S.log.filter(e => !/^Resumed — /.test(e.html));
+    const asset = S.started && data.scene && ART.find(a => a.kind === 'battle_map' && a.name === data.scene);
     SCENE = asset ? { asset, terrain: asset.terrain } : null;
-    S.log.unshift({ html: `Resumed — round ${S.round}.`, cls: 'd', pending: true });
+    S.log.unshift({ html: S.started ? `Resumed — round ${S.round}.` : `Resumed — in town, at ${S.place}.`,
+                    cls: 'd', pending: true });
     lastSaved = snapshot();
     drawLog(); draw();
     hint(`${CAMPAIGN.name}: resumed exactly where it stopped.`);
     /* the monsters' turn was a timer when the page closed; start it again */
     if (S.started && S.turn === 'foe') scheduleFoes(700);
   } catch (err) { hint(`Could not read the save (${err.message}).`); }
+}
+
+/* The start of a session: the party at the starting place, and the DM opens
+   with the hook. Also what "New session" does, after asking. */
+function newSession() {
+  clearTimeout(foeTimer);
+  S = freshTown(); SCENE = null; reach = {}; aiming = false; OUTCOME = [];
+  markSeats();
+  document.getElementById('log').innerHTML = '';
+  draw();
+  hint(`${CAMPAIGN ? CAMPAIGN.name + ': ' : ''}a new session. The Dungeon Master opens.`);
+  askDM('', { phase: PHASE.OPENING });
 }
 
 /* ---------- the spend meter -------------------------------------------- */
@@ -2193,16 +2680,24 @@ async function newCampaign() {
   }
 }
 
-function useCampaign(c) {
+async function useCampaign(c) {
   /* leaving a game: write it down before switching */
   if (S && CAMPAIGN && CAMPAIGN.id !== c.id) save(false);
-  CAMPAIGN = c; CHECKIN = null; hideCheckin();
-  try { localStorage.setItem(REMEMBER, JSON.stringify(c)); } catch (err) { /* convenience only */ }
+  CAMPAIGN = { id: c.id, name: c.name }; CHECKIN = null; hideCheckin();
+  try { localStorage.setItem(REMEMBER, JSON.stringify(CAMPAIGN)); } catch (err) { /* convenience only */ }
   document.getElementById('picker').className = 'picker';
   document.getElementById('campaignpill').textContent = c.name;
-  S = null; SCENE = null; lastSaved = '';
+  clearTimeout(foeTimer);
+  S = null; SCENE = null; lastSaved = ''; ROLL = c.roll || null;
   document.getElementById('log').innerHTML = '';
   refreshSpend();
+  /* the roll is the story: the map, the people, what the DM is running */
+  if (!ROLL) {
+    try {
+      const r = await fetch(`/api/campaign?id=${c.id}`, { cache: 'no-store' });
+      if (r.ok) ROLL = (await r.json()).roll || null;
+    } catch (err) { /* the town map falls back to the sites alone */ }
+  }
   load();
 }
 
@@ -2214,10 +2709,15 @@ document.getElementById('pick').innerHTML = Object.keys(ARCHETYPES).map(k => {
   return `<option value="${k}">${k} — AC ${a.ac}, ${a.hp} hp, ${a.speed} sq</option>`;
 }).join('');
 
-document.getElementById('bStart').onclick   = start;
-document.getElementById('bReset').onclick   = () => { S = null; reach = {}; aiming = false;
-  SCENE = null; document.getElementById('scene').value = '';
-  document.getElementById('log').innerHTML = ''; draw(); hint('Pick an archetype below and start a fight.'); };
+document.getElementById('bStart').onclick   = () => {
+  if (!S) { openPicker(); return; }
+  startFight(document.getElementById('fsize').value, S.place);
+};
+document.getElementById('bReset').onclick   = () => {
+  if (!CAMPAIGN) { openPicker(); return; }
+  if (confirm('Throw this session away and start again from the opening? '
+            + 'The campaign and its spending record are kept.')) newSession();
+};
 document.getElementById('bMove').onclick    = showMoves;
 document.getElementById('bAttack').onclick  = attack;
 document.getElementById('bDash').onclick    = dash;
@@ -2236,7 +2736,6 @@ document.getElementById('bNewCampaign').onclick = newCampaign;
 document.getElementById('newcampaign').addEventListener('keydown', ev => {
   if (ev.key === 'Enter') newCampaign();
 });
-document.getElementById('bScene').onclick   = loadScene;
 document.getElementById('who').onchange     = useWho;
 document.getElementById('dmruns').onchange  = () => { markSeats(); draw(); };
 
