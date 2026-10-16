@@ -297,27 +297,35 @@
               position: relative; display: none; overflow: hidden;
               border: 1px solid var(--line); border-radius: 9px; background: var(--grid); }
   .townwrap.on { display: block; }
-  .townwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .townwrap .plot { fill: var(--panel); stroke: var(--line); stroke-width: 1.5;
-                    vector-effect: non-scaling-stroke; }
-  .townwrap .plot.site { fill: var(--grid2); stroke: var(--muted); stroke-dasharray: 5 4; }
-  .townwrap .plot.here { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; }
-  .pin { position: absolute; transform: translate(-50%, -50%); max-width: 24%;
-         text-align: center; font-size: .76rem; font-weight: 700; line-height: 1.25;
-         padding: 4px 9px; border-radius: 7px; background: var(--panel);
-         border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
-  .pin small { display: block; font-weight: 500; font-size: .62rem; color: var(--muted); }
-  .pin .tag { display: block; font-size: .55rem; text-transform: uppercase;
-              letter-spacing: .07em; color: var(--accent); }
-  .pin.here { border: 2px solid var(--accent); }
-  .townnote { position: absolute; left: 10px; bottom: 7px; font-size: .68rem; color: var(--muted); }
+  /* the picture of where the party is, filling the board */
+  .townwrap .scene { position: absolute; inset: 0; width: 100%; height: 100%;
+                     object-fit: cover; cursor: zoom-in; }
+  .townwrap .noscene { position: absolute; inset: 0; display: grid; place-items: center;
+                       text-align: center; padding: 30px; color: var(--muted); }
+  .townwrap .placename { position: absolute; left: 14px; bottom: 12px; max-width: 60%;
+                         padding: 6px 12px; border-radius: 7px;
+                         background: rgba(12,10,8,.72); color: #f2ebe0; }
+  .townwrap .placename b { display: block; font-size: 1.05rem; }
+  .townwrap .placename span { font-size: .72rem; opacity: .8; }
+  /* places the party knows about: grows as the story reveals them */
+  .journal { position: absolute; right: 12px; top: 12px; width: min(230px, 40%);
+             padding: 8px 10px; border-radius: 8px; background: rgba(12,10,8,.72);
+             color: #f2ebe0; display: flex; flex-direction: column; gap: 4px; }
+  .journal h3 { margin: 0 0 2px; font-size: .58rem; text-transform: uppercase;
+                letter-spacing: .08em; opacity: .75; }
+  .journal button { text-align: left; font-size: .76rem; padding: 4px 8px;
+                    background: rgba(255,255,255,.08); color: inherit;
+                    border: 1px solid rgba(255,255,255,.14); }
+  .journal button.here { border-color: var(--accent); cursor: default; }
+  .journal button.here::after { content: ' · here'; font-size: .62rem; opacity: .8; }
+  .journal p { margin: 2px 0 0; font-size: .64rem; opacity: .7; }
   .party { display: flex; flex-direction: column; gap: 6px; }
   .party .who { font-size: .8rem; }
 
   /* narrow windows: stack and allow scrolling rather than crushing everything */
   @media (max-width: 1100px), (max-height: 520px) {
     .townwrap { max-height: none; }
-    .pin { font-size: .62rem; padding: 3px 5px; }
+    .journal { width: 46%; }
     body { overflow: auto; }
     .boardarea { flex: none; grid-template-columns: 1fr; }
     .caststrip { flex-direction: row; overflow-x: auto; }
@@ -343,7 +351,7 @@
   <span class="pill" id="foespill">—</span>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h4</span>
+  <span class="pill" id="buildpill" title="build">h5</span>
 </header>
 
 <!-- the big view, for showing everyone at the table one picture -->
@@ -444,6 +452,7 @@
   <section class="panel">
     <h2>Your character</h2>
     <div id="hero"></div>
+    <div id="actionsbox">
     <h2 style="margin-top:9px">Actions</h2>
     <div class="row">
       <button id="bMove">Move</button>
@@ -453,6 +462,7 @@
       <button id="bEnd">End turn</button>
     </div>
     <div class="row" id="abilities" style="margin-top:6px"></div>
+    </div>
     <div class="row">
     </div>
   </section>
@@ -726,6 +736,7 @@ function freshTown() {
     active: 0, order: [], slot: 0, foes: [],
     round: 0, turn: null, started: false, mode: null, acted: false,
     where: 'town', place: (ROLL && ROLL.start) || null, fight: null, fights: [], notes: [],
+    known: ROLL && ROLL.start ? [ROLL.start] : [], met: [],
     session: { played: 0, last: Date.now(), rested: false, finaleDone: false },
     log: [], chat: []
   };
@@ -736,6 +747,9 @@ function normalize(s) {
   s.where = s.started ? 'fight' : 'town';
   s.place = s.place || (ROLL && ROLL.start) || null;
   s.fights = s.fights || []; s.notes = s.notes || [];
+  /* a save from before discovery knows where it is and where it has fought */
+  s.known = s.known || [...new Set([s.place, ...s.fights.map(f => f.place)].filter(Boolean))];
+  s.met = s.met || [];
   s.session = s.session || { played: 0, rested: false, finaleDone: false };
   s.session.last = Date.now();
   s.foes = (s.foes || []).map(f => f.ac !== undefined ? f
@@ -883,7 +897,11 @@ const initials = n => n.replace(/[^A-Za-z0-9 #]/g,'').split(/\s+/)
 /* ---------- the conversation ------------------------------------------- */
 /* The DM's prose lives here; the Log panel keeps the dice. Typed commands are
    resolved locally by runCommand(); anything else goes to Claude via askDM().  */
-function narrate(text)  { if (!S) return; S.chat.push({ who: 'dm',  text }); drawChat(); }
+/* The DM's words are text, not markup: escaped, and its paragraph breaks kept
+   (they were running together into one block). */
+function narrate(text)  { if (!S) return;
+  S.chat.push({ who: 'dm', text: esc(text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>') });
+  drawChat(); }
 function youSaid(text)  { if (!S) return;
   // captured now, not at render time, or the whole backlog gets relabelled;
   // in town nobody has the turn, so it is the table talking
@@ -928,8 +946,9 @@ function runCommand(raw) {
       catchBreath(true); return true;
     }
     const goes = /\b(go|goes|head|heads|walk|walks|return|returns|make for|back to|over to|into)\b/.test(t);
+    /* only somewhere the party knows of; anywhere else is the DM's to answer */
     const p = goes && placeInText(t);
-    if (p) { goTo(p.name, true); return true; }
+    if (p && knows(p.name)) { goTo(p.name, true); return true; }
     return false;
   }
   if (S.turn !== 'hero') { sysLine('The enemy is moving.'); return true; }
@@ -1031,7 +1050,9 @@ function applyActions(actions) {
   /* The ones that work in either mode, or only in town. The DM has already
      narrated these, so none of them asks it to narrate again. */
   for (const a of actions) {
-    if (a.kind === 'note') addNote(a.text);
+    if (a.kind === 'reveal') reveal(a.place);
+    else if (a.kind === 'meet') meet(a.name);
+    else if (a.kind === 'note') addNote(a.text);
     else if (a.kind === 'rest') catchBreath(false);
     else if (a.kind === 'go') {
       if (S.started) sysLine('Not in the middle of a fight.');
@@ -1044,8 +1065,9 @@ function applyActions(actions) {
       setTimeout(() => startFight(a.size, a.place), 60);
     }
   }
+  draw();
   if (!S.started) return;
-  actions = actions.filter(a => !['note', 'rest', 'go', 'fight'].includes(a.kind));
+  actions = actions.filter(a => !['note', 'rest', 'go', 'fight', 'reveal', 'meet'].includes(a.kind));
 
   for (const a of actions.slice(0, 3)) {      // a turn is not a whole sequence
     if (S.turn !== 'hero') { sysLine('The Dungeon Master tried to act out of turn.'); return; }
@@ -1224,7 +1246,11 @@ async function askDM(raw, opts) {
           minutes: b.m, beat: b.beat, next: b.next, late: b.late,
           fights: S.fights, rested: S.session.rested, notes: S.notes,
           place: S.started ? null : S.place,
-          here: S.started ? [] : npcsAt(S.place).map(n => `${n.name} (${n.role.replace(/^The /, 'the ')})`)
+          /* what the picture on screen shows, so the words match it */
+          picture: S.started ? null : (findPlace(S.place) || {}).blurb || null,
+          here: S.started ? [] : npcsAt(S.place).map(n => `${n.name} (${n.role.replace(/^The /, 'the ')})`
+                                 + (S.met.includes(n.name) ? '' : ', NOT YET MET')),
+          known: S.known, met: S.met
         },
         /* the chat and the dice log are big and the server reads neither */
         state: { ...S, chat: undefined, log: undefined,
@@ -1335,6 +1361,7 @@ function goTo(name, narrate) {
   if (!p) { sysLine(`There is no "${name}" on the map.`); return; }
   if (p.name === S.place) { if (narrate) sysLine(`The party is already at ${p.name}.`); return; }
   S.place = p.name;
+  reveal(p.name);
   draw();
   if (narrate) askDM('', { phase: PHASE.TRAVEL, outcome: [`The party goes to ${p.name}.`] });
 }
@@ -1429,7 +1456,31 @@ function drawClock() {
   el.className = 'pill' + (b.late ? ' warn' : '');
 }
 
-/* ---------- the town map ---------------------------------------------------- */
+/* ---------- what the party can see -----------------------------------------
+   Julian, 2026-10-15: in a real game the table is not shown every location
+   up front; finding them is the fun. So the board shows a picture of where
+   the party is, and a journal lists only the places they have learned of.
+   NPCs work the same way: nobody is on the cast strip until they are met. */
+const knows = name => S.known.some(k => placeKey(k) === placeKey(name));
+function reveal(name) {
+  const p = findPlace(name);
+  if (!p || knows(p.name)) return;
+  S.known.push(p.name);
+  say(`New place: <b>${esc(p.name)}</b>`, 'd');
+}
+const npcKey = s => String(s || '').toLowerCase().replace(/^the\s+/, '');
+const findNpc = name => ((ROLL && ROLL.npcs) || []).find(n =>
+  npcKey(n.name) === npcKey(name) || npcKey(n.role) === npcKey(name)
+  || n.name.split(' ')[0].toLowerCase() === npcKey(name).split(' ')[0]);
+function meet(name) {
+  const n = findNpc(name);
+  if (!n || S.met.includes(n.name)) return;
+  S.met.push(n.name);
+  say(`Met: <b>${esc(n.name)}</b>, ${esc(n.role.replace(/^The /, 'the '))}`, 'd');
+}
+const sceneArt = name => ART.find(a => a.kind === 'scene' && a.key === placeKey(name).replace(/'/g, ''))
+  || ART.find(a => a.kind === 'scene' && artKey(a.name) === artKey(name)) || null;
+
 function drawTown() {
   const el = document.getElementById('town');
   /* where, not started: the finished fight stays on screen for a moment */
@@ -1438,28 +1489,29 @@ function drawTown() {
   document.getElementById('boardwrap').style.display = town ? 'none' : '';
   document.getElementById('legend').style.display = town ? 'none' : '';
   if (!town) return;
-  if (!S) { el.innerHTML = '<p class="townnote">Pick a campaign to begin.</p>'; return; }
+  if (!S) { el.innerHTML = '<div class="noscene">Pick a campaign to begin.</div>'; return; }
 
-  const ps = places();
-  const plots = ps.map(p => `<rect class="plot ${p.site ? 'site' : ''} ${p.name === S.place ? 'here' : ''}"
-      x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="1.2"/>`).join('');
-  const pins = ps.map((p, i) => {
-    const here = p.name === S.place;
-    const who = npcsAt(p.name).map(n => n.role.replace(/^The /, ''));
-    return `<button class="pin ${here ? 'here' : ''}" data-i="${i}"
-        style="left:${p.x + p.w / 2}%;top:${p.y + p.h / 2}%" title="${esc(p.blurb || p.name)}">
-        ${here ? '<span class="tag">the party is here</span>' : ''}${esc(p.name)}
-        ${who.length ? `<small>${esc(who.join(', '))}</small>` : ''}</button>`;
-  }).join('');
-  el.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${plots}</svg>`
-    + pins + `<span class="townnote">${esc((ROLL && ROLL.setting) || '')}`
-    + ` · click a place to go there · dashed outlines are where fights happen</span>`;
-  el.querySelectorAll('.pin').forEach(b => b.onclick = () => {
+  const p = findPlace(S.place) || { name: S.place || 'Somewhere', blurb: '' };
+  const art = sceneArt(p.name);
+  const known = places().filter(x => knows(x.name));
+  el.innerHTML =
+      (art ? `<img class="scene" src="assets/${art.view}" alt="${esc(p.name)}">`
+           : `<div class="noscene">No picture of ${esc(p.name)} yet. The Dungeon Master will describe it.</div>`)
+    + `<div class="placename"><b>${esc(p.name)}</b><span>${esc((ROLL && ROLL.setting) || '')}</span></div>`
+    + `<div class="journal"><h3>Places you know</h3>`
+    + known.map((x, i) => `<button data-i="${i}" class="${x.name === S.place ? 'here' : ''}"
+         title="${x.name === S.place ? 'The party is here' : 'Go there'}">${esc(x.name)}</button>`).join('')
+    + (known.length < 2 ? '<p>More will appear as you explore.</p>' : '')
+    + '</div>';
+
+  const img = el.querySelector('.scene');
+  if (img) img.onclick = () => openSpot(art);
+  el.querySelectorAll('.journal button').forEach(b => b.onclick = () => {
+    const x = known[+b.dataset.i];
+    if (x.name === S.place) return;
     if (dmBusy) { sysLine('The Dungeon Master is still speaking.'); return; }
-    const p = ps[+b.dataset.i];
-    if (p.name === S.place) return;
-    youSaid(`We go to ${esc(p.name)}.`);
-    goTo(p.name, true);
+    youSaid(`We go to ${esc(x.name)}.`);
+    goTo(x.name, true);
   });
 }
 
@@ -1471,7 +1523,7 @@ function startFight(size, placeName) {
   if (!S) return;
   if (S.started) { sysLine('A fight is already running.'); return; }
   const p = placeName && findPlace(placeName);
-  if (p) S.place = p.name;
+  if (p) { S.place = p.name; reveal(p.name); }
   const map = ART.find(a => a.kind === 'battle_map' && a.terrain && placeKey(a.name) === placeKey(S.place));
   SCENE = map ? { asset: map, terrain: map.terrain } : null;
 
@@ -1614,18 +1666,17 @@ function castList() {
   return out;
 }
 
-/* Town: the party, then whoever is here, then everyone else and where they
-   are. Never the boss: the table meets it at the finale. */
+/* Town: the party, then the people they have MET, whoever is here first.
+   Nobody unmet, and never where an unmet person can be found. */
 function townCast() {
   const out = S.chars.map(c => ({ cls: 'hero', label: c.name,
     sub: c.dead ? 'dead' : `${c.hp}/${c.max}`,
     art: findArt(c.name, 'portrait') || findArt(c.name, 'token') }));
-  const npcs = (ROLL && ROLL.npcs) || [];
-  const here = npcsAt(S.place);
-  for (const n of [...here, ...npcs.filter(x => !here.includes(x))])
+  const met = ((ROLL && ROLL.npcs) || []).filter(n => S.met.includes(n.name));
+  const here = met.filter(n => n.at && placeKey(n.at) === placeKey(S.place));
+  for (const n of [...here, ...met.filter(x => !here.includes(x))])
     out.push({ cls: here.includes(n) ? 'foe' : '', label: n.name,
-               sub: here.includes(n) ? `${n.role.replace(/^The /, 'the ')} · here`
-                  : `${n.role.replace(/^The /, 'the ')} · ${n.at || 'not here yet'}`,
+               sub: n.role.replace(/^The /, 'the ') + (here.includes(n) ? ' · here' : ''),
                art: findArt(n.role, 'portrait') });
   return out;
 }
@@ -2098,6 +2149,8 @@ const inRange = f => {
 function hint(t) { document.getElementById('hint').textContent = t; }
 
 function syncButtons() {
+  /* combat buttons only in a fight; in town they were greyed-out clutter */
+  document.getElementById('actionsbox').style.display = S && S.started ? '' : 'none';
   const e = effects();
   const on = S && S.started && S.turn === 'hero' && !me().dying && living().length > 0 && !e.noAct;
   const a = S ? ARCHETYPES[me().archetype] : null;

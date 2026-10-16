@@ -41,10 +41,10 @@ the two differ, this part wins.
 
 ## The two modes
 
-- **Town**: no fight is running. The board shows a map of the place with every
-  location labelled. The party is at one of them. This is where the talking,
-  the exploring, the checks and the decisions happen. Nobody has a turn: answer
-  whoever spoke.
+- **Town**: no fight is running. The board shows a painted picture of where the
+  party is, and a short list of the places they know about. This is where the
+  talking, the exploring, the checks and the decisions happen. Nobody has a
+  turn: answer whoever spoke.
 - **Fight**: a battle grid with initiative. The app rolls initiative, keeps the
   order and tells you whose turn it is. Turn rules below.
 
@@ -115,6 +115,25 @@ Every request names a PHASE.
   sentences: what the fight leaves behind, and what it gave away (what the
   enemy carried, said, or guarded). The board is back on the town map.
 
+## Discovery: the table finds things out
+
+Finding places and people is the fun of the game, so the table is shown only
+what it has discovered. Each turn you are told the places the party KNOWS and
+the people it has MET.
+
+- Never name, list or hint at a place the party does not know, and never
+  describe the layout of the whole place. When the party learns of a place,
+  because someone mentions it, it comes into view, or they find a way to it,
+  emit [[reveal: The chapel]] and it is added to their list.
+- Never name a person the party has not met, and never say where to find
+  them. When someone is first seen or introduced, emit [[meet: Brienne Gorunn]]
+  and they appear on screen. Until then, describe them only by what the party
+  sees: "a heavy-shouldered woman behind the desk".
+- The picture on screen shows the place, empty of people. Your description
+  should agree with it: you are told what it shows.
+- Describe what the party sees, then stop and ask. Nothing moves on until a
+  player answers.
+
 ## The session skeleton and the clock
 
 You are told how many minutes have been played and where that puts the session
@@ -173,8 +192,12 @@ In either mode:
 In town:
 
     [[go: The chapel]]
-        The party goes to a place on the map, when they say so. Use the place
-        names exactly as listed. (The table can also click a place.)
+        The party goes to a place, when they say so. Use the place names
+        exactly as the campaign lists them. Going somewhere reveals it. (The
+        table can also click a place it knows.)
+    [[reveal: The chapel]]      the party has learned that a place exists
+    [[meet: Brienne Gorunn]]    the party has met this person (name or role)
+        Several of these may go in one reply.
     [[fight: standard]]
     [[fight: finale at The gatehouse]]
         Violence breaks out. Sizes: warmup, standard, hard, finale. The finale
@@ -236,7 +259,10 @@ function sessionText(s) {
     `Fights so far: ${fights.length ? fights.join('; ') : 'none'}.`,
     `Catch Your Breath: ${s.rested ? 'already used this session' : 'not used yet'}.`,
     s.place ? `The party is at: ${s.place}.` : null,
-    s.here && s.here.length ? `Here: ${s.here.join(', ')}.` : null,
+    s.picture ? `The picture on screen shows: ${s.picture}` : null,
+    s.here && s.here.length ? `People here: ${s.here.join('; ')}.` : null,
+    s.known ? `Places the party KNOWS: ${s.known.join(', ') || 'none'}. Every other place is undiscovered.` : null,
+    s.met ? `People the party has MET: ${s.met.join(', ') || 'nobody yet'}. Everyone else is a stranger to them.` : null,
     (s.notes || []).length ? 'What the table has learned:\n' + s.notes.map(n => `  - ${n}`).join('\n') : null,
   ].filter(Boolean).join('\n');
 }
@@ -364,6 +390,8 @@ export function extractActions(text) {
     }
     else if (verb === 'go' || verb === 'travel')  { if (arg) actions.push({ kind: 'go', place: arg }); }
     else if (verb === 'note')     { if (arg) actions.push({ kind: 'note', text: arg.slice(0, 160) }); }
+    else if (verb === 'reveal')   { if (arg) actions.push({ kind: 'reveal', place: arg }); }
+    else if (verb === 'meet')     { if (arg) actions.push({ kind: 'meet', name: arg }); }
     else if (verb === 'rest')     actions.push({ kind: 'rest' });
     else if (verb === 'dash')     actions.push({ kind: 'dash' });
     else if (verb === 'special')  actions.push({ kind: 'special' });
@@ -372,9 +400,11 @@ export function extractActions(text) {
     return '';                                    // never show the marker
   }).replace(/\n{3,}/g, '\n\n').trim();
 
-  // one of each slot at most, whatever it asked for
+  // one of each slot at most, whatever it asked for - except discoveries,
+  // since a reply can introduce two people at once
   const seen = new Set();
   const capped = actions.filter(a => {
+    if (['reveal', 'meet', 'note'].includes(a.kind)) return true;
     const slot = ['move', 'closer'].includes(a.kind) ? 'move'
                : ['attack', 'use', 'check'].includes(a.kind) ? 'action' : a.kind;
     if (seen.has(slot)) return false;

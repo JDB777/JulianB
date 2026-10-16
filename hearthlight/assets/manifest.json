@@ -444,6 +444,90 @@
    "h": 1024,
    "verdict": null,
    "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The wall walk",
+   "key": "wallwalk",
+   "archetype": null,
+   "view": "scene_the_wall_walk.webp",
+   "thumb": "scene_the_wall_walk_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The cell block",
+   "key": "cellblock",
+   "archetype": null,
+   "view": "scene_the_cell_block.webp",
+   "thumb": "scene_the_cell_block_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The yard at exercise",
+   "key": "yardatexercise",
+   "archetype": null,
+   "view": "scene_the_yard_at_exercise.webp",
+   "thumb": "scene_the_yard_at_exercise_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The gaoler's office",
+   "key": "gaolersoffice",
+   "archetype": null,
+   "view": "scene_the_gaoler_s_office.webp",
+   "thumb": "scene_the_gaoler_s_office_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The chapel",
+   "key": "chapel",
+   "archetype": null,
+   "view": "scene_the_chapel.webp",
+   "thumb": "scene_the_chapel_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The gatehouse",
+   "key": "gatehouse",
+   "archetype": null,
+   "view": "scene_the_gatehouse.webp",
+   "thumb": "scene_the_gatehouse_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
+  },
+  {
+   "kind": "scene",
+   "name": "The road to the gate",
+   "key": "roadtothegate",
+   "archetype": null,
+   "view": "scene_the_road_to_the_gate.webp",
+   "thumb": "scene_the_road_to_the_gate_t.webp",
+   "w": 1264,
+   "h": 848,
+   "verdict": null,
+   "terrain": null
   }
  ]
 }
