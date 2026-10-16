@@ -188,6 +188,11 @@ In either mode:
         NPC's attitude), anything inventive. Name the ability, optionally the
         skill, and the character. The app rolls it with their bonuses. DC 10
         easy, 15 medium, 20 hard.
+        The table rolls it on screen with an animated die, so end your reply
+        on the moment before the roll, the held breath, and do not guess at
+        the outcome. For a big moment (a seduction, a leap, a lie that could
+        end everything), add "dramatic" and the die plays slowly:
+            [[check: DC 15 CHA persuasion for Kestrel dramatic]]
 
 In town:
 
@@ -373,9 +378,12 @@ export function extractActions(text) {
       actions.push({ kind: 'use', ability: (ab || '').trim(), target: (tgt || '').trim() || null });
     }
     else if (verb.startsWith('check')) {
-      /* "DC 15 WIS insight for Kestrel" - every part but the DC optional */
-      const m2 = body.match(/DC\s*(\d+)\s*([A-Za-z]{3})?\s*([A-Za-z][A-Za-z ]*?)?\s*(?:\bfor\s+(.+))?$/i);
-      actions.push({ kind: 'check',
+      /* "DC 15 WIS insight for Kestrel" - every part but the DC optional;
+         "dramatic" anywhere marks a big moment, which the dice play slowly */
+      const big = /\bdramatic\b/i.test(body);
+      const m2 = body.replace(/[,\s]*\bdramatic\b/ig, '')
+        .match(/DC\s*(\d+)\s*([A-Za-z]{3})?\s*(?:(?!for\b)([A-Za-z][A-Za-z ]*?))?\s*(?:\bfor\s+(.+))?$/i);
+      actions.push({ kind: 'check', big,
                      dc: m2 ? +m2[1] : 15,
                      stat: m2 && m2[2] ? m2[2].toUpperCase() : 'DEX',
                      skill: m2 && m2[3] ? m2[3].trim().toLowerCase() : null,

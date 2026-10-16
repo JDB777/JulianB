@@ -322,6 +322,64 @@
   .party { display: flex; flex-direction: column; gap: 6px; }
   .party .who { font-size: .8rem; }
 
+  /* ---- the dice: a roll plays out over the board before anything is shown ---- */
+  .boardpane { position: relative; }
+  .dice { position: absolute; inset: 0; z-index: 5; display: none; overflow: hidden;
+          border-radius: 9px; color: #f1e8da; --die: #efe6d6; --dieInk: #2a211a;
+          --dieEdge: #b9a88f; --gold: #e2b345; --okc: #2f6b3f; --noc: #9b2f22; }
+  .dice.on { display: block; }
+  .dice .dim { position: absolute; inset: 0; background: rgba(8,6,4,.58); transition: filter .5s; }
+  .dice.shake { animation: dshake .22s linear; }
+  .dice.grey .dim { background: rgba(8,6,4,.72); }
+  @keyframes dshake { 0%,100% { transform: none; } 25% { transform: translate(3px,-2px); }
+                      50% { transform: translate(-3px,2px); } 75% { transform: translate(2px,1px); } }
+  .dcall { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); width: min(420px, 86%);
+           text-align: center; padding: 14px 16px; border-radius: 10px;
+           background: rgba(20,16,12,.92); border: 1px solid rgba(255,255,255,.14); }
+  .dcall .w { font-weight: 700; }
+  .dcall .q { font: 700 1.15rem Georgia, "Times New Roman", serif; margin: 2px 0 10px; }
+  .dcall button { font: 800 1rem Georgia, serif; letter-spacing: .1em; text-transform: uppercase;
+                  padding: 9px 28px; border: 0; border-radius: 8px; background: var(--accent);
+                  color: #fff; cursor: pointer; animation: dpulse 1.8s ease-in-out infinite; }
+  @keyframes dpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(212,105,79,.55); } 50% { box-shadow: 0 0 0 9px transparent; } }
+  .ddie { position: absolute; left: 0; top: 0; width: 13%; aspect-ratio: 1; will-change: transform;
+          filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); transition: opacity .5s, filter .4s; }
+  .ddie svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .ddie .out  { fill: var(--die); stroke: var(--dieEdge); stroke-width: 2; stroke-linejoin: round; }
+  .ddie .face { fill: #f7f1e6; stroke: var(--dieEdge); stroke-width: 1.5; }
+  .ddie .edge { stroke: var(--dieEdge); stroke-width: 1.5; }
+  .ddie .num  { font: 800 19px Georgia, serif; fill: var(--dieInk); text-anchor: middle; }
+  .ddie .crack { fill: none; stroke: #1a1410; stroke-width: 2.2; stroke-linecap: round; opacity: 0; }
+  .ddie.cracked .crack { opacity: 1; }
+  .ddie.gold { filter: drop-shadow(0 0 18px var(--gold)) drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
+  .ddie.gold .out { fill: var(--gold); } .ddie.gold .face { fill: #f3dc9c; }
+  .ddie.loser { opacity: .22; filter: grayscale(1); }
+  .dread { position: absolute; left: 0; right: 0; bottom: 8%; display: flex; flex-direction: column;
+           align-items: center; gap: 4px; text-align: center; pointer-events: none; }
+  .dread .who { font-size: .8rem; opacity: .75; }
+  .dline { display: flex; align-items: baseline; gap: .35em; font-family: Georgia, serif;
+           font-variant-numeric: tabular-nums; }
+  .draw { font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 800; }
+  .dmod, .dtot, .dvs { font-size: clamp(1rem, 2.4vw, 1.6rem); font-weight: 600; }
+  .dtot { font-weight: 800; } .dvs { opacity: .8; }
+  .dverdict { font: 800 clamp(1.2rem, 3.4vw, 2rem) Georgia, serif; letter-spacing: .12em;
+              padding: 2px 16px; border-radius: 6px; }
+  .dverdict.ok { background: var(--okc); color: #fff; } .dverdict.no { background: var(--noc); color: #fff; }
+  .dverdict.crit { background: var(--gold); color: #2a1d05; }
+  .ddmg { font: 700 1.1rem Georgia, serif; }
+  .dpop { opacity: 0; transform: translateY(8px) scale(.96); transition: opacity .28s, transform .28s; }
+  .dpop.on { opacity: 1; transform: none; }
+  .dspark { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
+            left: var(--x); top: var(--y); pointer-events: none; animation: dspark .9s ease-out forwards; }
+  @keyframes dspark { from { transform: translate(-50%,-50%); opacity: 1; }
+                      to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.3); opacity: 0; } }
+  /* while a roll is unrevealed nothing else can be touched */
+  body.rolling .infoarea, body.rolling .chatbox, body.rolling .caststrip { pointer-events: none; opacity: .55; }
+  .msg.roll { align-self: center; max-width: 100%; background: transparent; border: 1px dashed var(--line);
+              font-size: .78rem; font-variant-numeric: tabular-nums; }
+  .msg.roll b.ok { color: var(--good); } .msg.roll b.no { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .dcall button { animation: none; } .dice.shake { animation: none; } }
+
   /* narrow windows: stack and allow scrolling rather than crushing everything */
   @media (max-width: 1100px), (max-height: 520px) {
     .townwrap { max-height: none; }
@@ -349,9 +407,11 @@
   <span id="hint">Pick an archetype below and start a fight.</span>
   <span class="spacer"></span>
   <span class="pill" id="foespill">—</span>
+  <button class="pill link" id="fastpill" title="Full dice: every roll plays out. Fast dice: half the time.">dice: full</button>
+  <button class="pill link" id="soundpill" title="Dice sounds">sound: off</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h5</span>
+  <span class="pill" id="buildpill" title="build">h6</span>
 </header>
 
 <!-- the big view, for showing everyone at the table one picture -->
@@ -380,6 +440,21 @@
   <div class="boardpane">
     <div class="boardwrap" id="boardwrap"><table id="board"></table></div>
     <div class="townwrap" id="town"></div>
+    <div class="dice" id="dice" aria-live="polite">
+      <div class="dim"></div>
+      <div class="dcall" id="dcall" hidden>
+        <div class="w" id="dcallwho"></div>
+        <div class="q" id="dcallwhat"></div>
+        <button id="dcallbtn">Roll</button>
+      </div>
+      <div class="dread">
+        <div class="who dpop" id="dwho"></div>
+        <div class="dline"><span class="draw dpop" id="draw"></span><span class="dmod dpop" id="dmod"></span><span class="dtot dpop" id="dtot"></span></div>
+        <div class="dline"><span class="dvs dpop" id="dvs"></span></div>
+        <div class="dverdict dpop" id="dverdict"></div>
+        <div class="ddmg dpop" id="ddmg"></div>
+      </div>
+    </div>
 
     <div class="legend" id="legend">
       <span><i class="sw" style="background:var(--move)"></i> can reach</span>
@@ -877,15 +952,225 @@ const d = n => 1 + Math.floor(Math.random() * n);
 /* Advantage and disadvantage annihilate — rules/00-core-loop.md */
 function d20(adv, dis) {
   const a = d(20), b = d(20);
-  if (adv && !dis) return { roll: Math.max(a,b), note: ` (adv ${a}/${b})` };
-  if (dis && !adv) return { roll: Math.min(a,b), note: ` (dis ${a}/${b})` };
-  return { roll: a, note: '' };
+  if (adv && !dis) return { roll: Math.max(a,b), note: ` (adv ${a}/${b})`, dice: [a, b] };
+  if (dis && !adv) return { roll: Math.min(a,b), note: ` (dis ${a}/${b})`, dice: [a, b] };
+  return { roll: a, note: '', dice: [a] };
 }
 const rollDice = ([n, faces]) => { let t = 0; for (let i = 0; i < n; i++) t += d(faces); return t; };
+
+/* ---------- the dice, shown -----------------------------------------------
+   Julian, 2026-10-15: "It's fine if you get the number immediately - you just
+   can't show it to the players until the roll is done." So the engine rolls
+   and resolves at once, as it always has, and only the SHOWING waits. While a
+   roll is on screen the page stops redrawing, so no hit point bar, log line or
+   DM sentence can give the result away; when the die lands, it all appears.
+   The DM is asked for its narration straight away, so it is usually ready by
+   the time the die stops. */
+let HOLD = 0, DIRTY = false, HELD_HINT = null;
+let diceChain = Promise.resolve();
+const whenRevealed = fn => { diceChain = diceChain.then(fn); };
+const PACE = { quick: .5, normal: 1, dramatic: 1.45 };
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let FAST = false, SOUND = false;
+try { FAST = localStorage.getItem('hl-fast') === '1'; SOUND = localStorage.getItem('hl-sound') === '1'; } catch (e) {}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* A roll to show. spec: { who, what, rolls, keep, mod, label, ok, words,
+   damage, pace, press }. `ok` is whether it went the table's way; words are
+   what to call that ([good, bad]). The card is what stays in the chat. */
+function showRoll(spec, card) {
+  HOLD++;
+  document.body.classList.add('rolling');
+  if (card && S) S.chat.push({ who: 'roll', text: card });
+  /* saved now, not when shown: refreshing the page must not re-roll it */
+  queueSave();
+  diceChain = diceChain.then(() => playRoll(spec)).catch(e => console.error('dice', e)).then(() => {
+    HOLD = Math.max(0, HOLD - 1);
+    if (HOLD) return;
+    document.body.classList.remove('rolling');
+    if (HELD_HINT) { const h = HELD_HINT; HELD_HINT = null; hint(h); }
+    if (S) { drawLog(); draw(); }
+  });
+}
+/* the card a roll leaves in the chat: the numbers, then the verdict */
+function rollCard(who, what, rolls, keep, mod, label, ok, word) {
+  const dice = rolls.length === 2 ? `${rolls[0]} and ${rolls[1]}, keep ${keep}` : `${keep}`;
+  const sum = mod ? ` ${mod > 0 ? '+' : '−'} ${Math.abs(mod)} = ${keep + mod}` : '';
+  return `🎲 <b>${esc(who.split(' ')[0])}</b> · ${esc(what)}: ${dice}${sum} ${label} · `
+       + `<b class="${ok ? 'ok' : 'no'}">${word}</b>`;
+}
+
+/* sound, made on the spot, only after the table turns it on */
+let AC = null;
+function actx() {
+  if (!SOUND) return null;
+  try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  return AC;
+}
+function tone(freq, dur, type, vol, when, glideTo) {
+  const a = actx(); if (!a) return;
+  const t = a.currentTime + (when || 0), o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+  if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+  g.gain.setValueAtTime(vol || .2, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+function clack() {
+  const a = actx(); if (!a) return;
+  const len = Math.floor(a.sampleRate * .03), buf = a.createBuffer(1, len, a.sampleRate), x = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  f.type = 'bandpass'; f.frequency.value = 2400 + Math.random() * 1600; g.gain.value = .5;
+  s.buffer = buf; s.connect(f).connect(g).connect(a.destination); s.start();
+}
+const thunk = () => tone(140, .28, 'sine', .45, 0, 55);
+const chime = ok => ok ? (tone(660, .5, 'sine', .18), tone(990, .6, 'sine', .12, .09))
+                       : (tone(220, .45, 'triangle', .2), tone(165, .6, 'triangle', .18, .16));
+const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .5, 'triangle', .16, i * .1));
+
+function makeDie(box) {
+  const el = document.createElement('div');
+  el.className = 'ddie';
+  el.innerHTML = `<svg viewBox="-50 -50 100 100" aria-hidden="true">
+    <polygon class="out" points="0,-46 40,-23 40,23 0,46 -40,23 -40,-23"/>
+    <polygon class="face" points="0,-30 26,15 -26,15"/>
+    <path class="edge" d="M0,-30 L0,-46 M0,-30 L40,-23 M0,-30 L-40,-23 M26,15 L40,-23 M26,15 L40,23 M26,15 L0,46 M-26,15 L-40,-23 M-26,15 L-40,23 M-26,15 L0,46"/>
+    <text class="num" y="7">20</text>
+    <path class="crack" d="M-6,-40 L2,-22 L-8,-6 L5,8 L-3,26 L4,42 M-8,-6 L-24,2"/></svg>`;
+  box.appendChild(el);
+  return el;
+}
+const setFace = (el, n) => { el.querySelector('.num').textContent = n; };
+const otherFace = n => { let m; do { m = d(20); } while (m === n); return m; };
+
+/* Across the board, fast and flickering, slowing, then a wobble that nearly
+   shows one number before tipping onto the real one. The prototype's motion. */
+function tumble(box, el, final, pace, slot, slots) {
+  return new Promise(done => {
+    const W = box.clientWidth, H = box.clientHeight, size = el.clientWidth;
+    const endX = W / 2 - size / 2 + (slots === 2 ? (slot ? 1 : -1) * size * .75 : 0);
+    const endY = H * .4 - size / 2;
+    const startX = -size, startY = H * (.12 + Math.random() * .25);
+    const T = 1400 * pace, WOB = 520 * pace;
+    const spin = (slot ? -1 : 1) * (900 + Math.random() * 500);
+    const tease = otherFace(final);
+    let t0 = null, face = d(20), lastFlip = -1e9, lastHop = 1;
+    if (REDUCE) {
+      el.style.transform = `translate(${endX}px, ${endY}px)`;
+      setFace(el, final); setTimeout(done, 300 * pace); return;
+    }
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      const t = ts - t0;
+      let x, y, rot;
+      if (t < T) {
+        const p = t / T, e = 1 - Math.pow(1 - p, 3);
+        x = startX + (endX - startX) * e;
+        const hop = Math.abs(Math.sin(p * Math.PI * 3.5));
+        y = endY - hop * (1 - p) * H * .32;
+        if (hop < .12 && lastHop >= .12) clack();
+        lastHop = hop;
+        rot = spin * (1 - Math.pow(1 - p, 2.2));
+        if (t - lastFlip > 40 + 190 * p * p) { face = otherFace(face); setFace(el, face); lastFlip = t; }
+      } else if (t < T + WOB) {
+        const q = (t - T) / WOB;
+        x = endX; y = endY;
+        rot = spin + Math.sin(q * Math.PI * 3) * 16 * (1 - q);
+        setFace(el, q < .55 ? tease : final);
+      } else {
+        el.style.transform = `translate(${endX}px, ${endY}px) rotate(${spin}deg)`;
+        setFace(el, final);
+        done(); return;
+      }
+      el.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+function sparks(box, el) {
+  const r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
+  const cx = r.left - b.left + r.width / 2, cy = r.top - b.top + r.height / 2;
+  for (let i = 0; i < 22; i++) {
+    const s = document.createElement('span'), a = Math.random() * Math.PI * 2, dd = 60 + Math.random() * 120;
+    s.className = 'dspark';
+    s.style.cssText = `--x:${cx}px;--y:${cy}px;--dx:${Math.cos(a) * dd}px;--dy:${Math.sin(a) * dd}px`;
+    box.appendChild(s); setTimeout(() => s.remove(), 1000);
+  }
+}
+
+const DPOPS = ['dwho', 'draw', 'dmod', 'dtot', 'dvs', 'dverdict', 'ddmg'];
+const dshow = (id, text, cls) => {
+  const e = document.getElementById(id);
+  e.textContent = text; if (cls) e.classList.add(cls); e.classList.add('on');
+};
+
+async function playRoll(s) {
+  const box = document.getElementById('dice');
+  const pace = PACE[s.pace || 'normal'] * (FAST ? .5 : 1);
+  box.querySelectorAll('.ddie, .dspark').forEach(e => e.remove());
+  DPOPS.forEach(id => { const e = document.getElementById(id); e.className = e.className.split(' ')[0] + ' dpop'; e.textContent = ''; });
+  box.classList.remove('grey');
+  box.classList.add('on');
+
+  /* the call: nothing rolls until someone at the table commits */
+  if (s.press) {
+    const call = document.getElementById('dcall'), btn = document.getElementById('dcallbtn');
+    document.getElementById('dcallwho').textContent = s.who;
+    document.getElementById('dcallwhat').textContent = s.what;
+    call.hidden = false;
+    btn.disabled = false;
+    btn.focus();
+    await new Promise(res => { btn.onclick = () => { btn.disabled = true; res(); }; });
+    call.hidden = true;
+  }
+  dshow('dwho', `${s.who} · ${s.what}`);
+
+  const dice = s.rolls.map(() => makeDie(box));
+  await Promise.all(dice.map((el, i) => tumble(box, el, s.rolls[i], pace, i, s.rolls.length)));
+  thunk();
+  if (!REDUCE) { box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); }
+  await sleep(250 * pace);
+  const keepI = s.rolls.length === 2 ? (s.rolls[0] === s.keep ? 0 : 1) : 0;
+  if (s.rolls.length === 2) { dice[1 - keepI].classList.add('loser'); await sleep(450 * pace); }
+  const die = dice[keepI];
+
+  if (s.keep === 20) {                               // freeze, glow, burst
+    await sleep(350 * pace);
+    die.classList.add('gold'); sparks(box, die); fanfare();
+    dshow('draw', '20');
+    await sleep(500 * pace);
+  } else if (s.keep === 1) {                         // it cracks
+    await sleep(300 * pace);
+    die.classList.add('cracked'); box.classList.add('grey'); tone(70, .7, 'sawtooth', .12);
+    dshow('draw', '1');
+    await sleep(600 * pace);
+  } else {
+    dshow('draw', String(s.keep));                   // the bare number, alone
+    await sleep(650 * pace);
+  }
+  if (s.mod && s.keep !== 20 && s.keep !== 1) {
+    dshow('dmod', (s.mod > 0 ? '+ ' : '− ') + Math.abs(s.mod));
+    await sleep(320 * pace);
+    const tot = document.getElementById('dtot'); tot.classList.add('on');
+    for (let k = 0; k <= 8; k++) { tot.textContent = '= ' + Math.round(s.keep + (s.mod * k) / 8); await sleep(40 * pace); }
+  }
+  const close = s.target !== undefined && Math.abs(s.keep + (s.mod || 0) - s.target) <= 1;
+  await sleep((close ? 900 : 450) * pace);           // a near thing waits longer
+  if (s.label) { dshow('dvs', s.label); await sleep(420 * pace); }
+  const word = s.ok ? s.words[0] : s.words[1];
+  dshow('dverdict', word, s.keep === 20 && s.ok ? 'crit' : s.ok ? 'ok' : 'no');
+  if (s.keep !== 20) chime(s.ok);
+  if (s.damage) { await sleep(300 * pace); dshow('ddmg', `${s.damage} damage`); }
+  await sleep(s.press ? 1300 : 800 * pace + 250);
+  box.classList.remove('on');
+}
 
 /* ---------- log -------------------------------------------------------- */
 function say(html, cls) { S.log.unshift({ html, cls: cls || '' }); drawLog(); }
 function drawLog() {
+  if (HOLD) { DIRTY = true; return; }               // a roll is still on screen
   document.getElementById('log').innerHTML =
     S.log.map(e => `<p class="${e.cls}">${e.html}</p>`).join('');
 }
@@ -910,6 +1195,7 @@ function youSaid(text)  { if (!S) return;
 function sysLine(text)  { if (!S) return; S.chat.push({ who: 'sys', text }); drawChat(); }
 
 function drawChat() {
+  if (HOLD) { DIRTY = true; return; }               // a roll is still on screen
   const el = document.getElementById('chatlog');
   if (!S || !S.chat.length) {
     el.className = 'chatlog empty';
@@ -917,8 +1203,8 @@ function drawChat() {
     return;
   }
   el.className = 'chatlog';
-  el.innerHTML = S.chat.map(m => m.who === 'sys'
-    ? `<div class="msg sys">${m.text}</div>`
+  el.innerHTML = S.chat.map(m => m.who === 'sys' || m.who === 'roll'
+    ? `<div class="msg ${m.who}">${m.text}</div>`
     : `<div class="msg ${m.who}"><span class="lbl">${m.who === 'dm' ? 'Dungeon Master' : (m.name || 'You')}</span>${m.text}</div>`
   ).join('');
   el.scrollTop = el.scrollHeight;
@@ -1282,7 +1568,7 @@ async function askDM(raw, opts) {
           name: me() ? me().name : null,
           spellUses: me() ? (me().uses === undefined ? 4 : me().uses) : 4
         } },
-        history: S.chat.filter(m => m.who !== 'sys' && !m.pending).slice(-16)
+        history: S.chat.filter(m => (m.who === 'dm' || m.who === 'you') && !m.pending).slice(-16)
       })
     });
     const data = await r.json();
@@ -1313,6 +1599,7 @@ async function askDM(raw, opts) {
 }
 
 function sendChat() {
+  if (HOLD) return;                                 // the dice first; the text stays in the box
   const box = document.getElementById('chatin');
   const text = box.value.trim();
   if (!text) return;
@@ -1403,9 +1690,16 @@ function doCheck(a) {
   const skill = a.skill && sheetOf(c).skills.includes(a.skill) ? a.skill : null;
   const bonus = checkBonus(c, abil, skill);
   const e = effects(c);
-  const { roll, note } = d20(e.youAdv && !e.youDis, e.youDis && !e.youAdv);
+  const { roll, note, dice } = d20(e.youAdv && !e.youDis, e.youDis && !e.youAdv);
   const total = roll + bonus, dc = a.dc || 15, ok = total >= dc;
   const what = `${abil.toUpperCase()}${a.skill ? ` (${a.skill})` : ''}`;
+  const NAMES = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+  const ask = `Roll ${NAMES[abil]}${a.skill ? ` (${a.skill.replace(/\b\w/g, ch => ch.toUpperCase())})` : ''}`;
+  /* a person presses Roll, unless the DM is playing this character */
+  showRoll({ who: c.name, what: ask, rolls: dice, keep: roll, mod: bonus, target: dc,
+             label: `vs DC ${dc}`, ok, words: ['SUCCESS', 'FAILURE'],
+             press: !(S.started && c.dmRun), pace: a.big ? 'dramatic' : 'normal' },
+           rollCard(c.name, ask.replace(/^Roll /, ''), dice, roll, bonus, `vs DC ${dc}`, ok, ok ? 'Success' : 'Failure'));
   say(`${c.name} — ${what} check: ${roll}${note} ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = <b>${total}</b> vs DC ${dc}. `
     + (ok ? '<span class="hit">Success.</span>' : '<span class="miss">Failure.</span>'), 'd');
   record(`${c.name} made a ${what} check: ${total} against DC ${dc}, a ${ok ? 'success' : 'failure'}`
@@ -1842,6 +2136,7 @@ function aimDist() {
 }
 
 function draw() {
+  if (HOLD) { DIRTY = true; return; }               // nothing may give the roll away
   let html = '<tr class="head"><th class="rowh"></th>';
   for (let x = 0; x < COLS; x++) html += `<th>${COL_NAMES[x]}</th>`;
   html += '</tr>';
@@ -2042,12 +2337,18 @@ function useAbility(k, named) {
     }
     me().uses -= 1;
     /* monsters save at a flat +2, something tough at +5 (rules/07-monsters.md) */
-    const sv = d(20) + ((t.boss || (t.threat || 1) >= 4) ? 5 : 2);
+    const sb = (t.boss || (t.threat || 1) >= 4) ? 5 : 2;
+    const raw = d(20), sv = raw + sb;
     const made = sv >= dc;
+    let dmg = 0;
+    if (dice[0]) { dmg = roll(dice[0], dice[1]); if (made) dmg = Math.floor(dmg / 2); }
+    showRoll({ who: t.name, what: `resists ${k.name}`, rolls: [raw], keep: raw, mod: sb, target: dc,
+               label: `vs DC ${dc}`, ok: !made, words: ['FAILS', made && dmg ? 'HALF' : 'SAVES'],
+               damage: dmg, pace: 'quick' },
+             rollCard(t.name, `resists ${k.name}`, [raw], raw, sb, `vs DC ${dc}`, !made,
+                      (made ? 'Saves' : 'Fails') + (dmg ? ` · ${dmg} damage` : '')));
 
     if (dice[0]) {
-      let dmg = roll(dice[0], dice[1]);
-      if (made) dmg = Math.floor(dmg / 2);
       t.hp -= dmg;
       say(`<b>${k.name}</b> (${k.quality}) at ${t.name} — save ${sv} vs DC ${dc}: ` +
           `${made ? 'made it, half' : '<span class="hit">failed</span>'}. ` +
@@ -2146,7 +2447,10 @@ const inRange = f => {
   const dist = cheb(me().at, f.at);
   return myAttacks().some(w => dist <= w.range);
 };
-function hint(t) { document.getElementById('hint').textContent = t; }
+function hint(t) {
+  if (HOLD) { HELD_HINT = t; return; }              // "Goblin #2 is down" would spoil it
+  document.getElementById('hint').textContent = t;
+}
 
 function syncButtons() {
   /* combat buttons only in a fight; in town they were greyed-out clutter */
@@ -2191,7 +2495,8 @@ function beginSlot(first) {
     S.turn = 'foe';
     reach = {}; aiming = false; S.mode = null;
     draw(); hint('The enemy is moving…');
-    scheduleFoes(first ? 700 : 450);
+    /* not while the last blow is still rolling on screen */
+    whenRevealed(() => scheduleFoes(first ? 700 : 450));
     return;
   }
   S.active = o.i;
@@ -2209,7 +2514,7 @@ function beginSlot(first) {
   }
   draw();
   hint(`${c.name}'s turn — say what they do.`);
-  if (c.dmRun) { setTimeout(() => askDM('', { phase: PHASE.AWAIT }), 500); return; }
+  if (c.dmRun) { whenRevealed(() => setTimeout(() => askDM('', { phase: PHASE.AWAIT }), 500)); return; }
   /* Julian's rule: the DM opens a turn with this one line and offers nothing
      else unless a player asks. Written here rather than asked of the model, so
      it is guaranteed, instant and free. */
@@ -2286,9 +2591,12 @@ function swing(w, target, n, of) {
   const ac = (target.ac || 15) + (cover ? 2 : 0);
 
   if (w.save) {                       /* Vicious Mockery — a save, not an attack roll */
-    const sv = d(20) + 2;
+    const raw = d(20), sv = raw + 2;
+    const dmg = sv >= w.save ? 0 : rollDice(w.dice);
+    showRoll({ who: target.name, what: `resists ${w.n}`, rolls: [raw], keep: raw, mod: 2, target: w.save,
+               label: `vs DC ${w.save}`, ok: sv < w.save, words: ['FAILS', 'SAVES'], damage: dmg, pace: 'quick' },
+             rollCard(target.name, `resists ${w.n}`, [raw], raw, 2, `vs DC ${w.save}`, sv < w.save, sv < w.save ? 'Fails' : 'Saves'));
     if (sv >= w.save) { say(`<b>${label}</b> at ${target.name} — it saves (${sv} vs DC ${w.save}). No effect.`, 'miss'); return; }
-    const dmg = rollDice(w.dice);
     target.hp -= dmg;
     say(`<b>${label}</b> at ${target.name} — it fails (${sv} vs DC ${w.save}). <span class="hit">${dmg} psychic.</span>`, '');
     record(`${me().name} used ${w.n} on ${target.name}, which took ${dmg}.`);
@@ -2300,15 +2608,24 @@ function swing(w, target, n, of) {
     return;
   }
 
-  const { roll, note } = d20(adv, dis);
+  const { roll, note, dice } = d20(adv, dis);
   const total = roll + w.hit;
+  /* decided now, shown as the die lands: hit or miss, then the damage */
+  const shown = (hit, dmg) => showRoll(
+    { who: me().name, what: `${label} at ${target.name}`, rolls: dice, keep: roll, mod: w.hit,
+      target: ac, label: `vs AC ${ac}`, ok: hit, words: [roll === 20 ? 'CRITICAL!' : 'HIT', 'MISS'],
+      damage: dmg, pace: 'quick' },
+    rollCard(me().name, `${label} at ${target.name}`, dice, roll, w.hit, `vs AC ${ac}`, hit,
+             hit ? (roll === 20 ? 'Critical' : 'Hit') + ` · ${dmg} damage` : 'Miss'));
   if (roll === 1) {
+    shown(false, 0);
     say(`<b>${label}</b> at ${target.name} — natural 1. Always a miss.`, 'miss');
     record(`${me().name} swung ${w.n} at ${target.name} and fumbled it completely.`);
     return;
   }
   const crit = roll === 20;
   if (!crit && total < ac) {
+    shown(false, 0);
     say(`<b>${label}</b> at ${target.name} — ${total}${note} vs AC ${ac}${cover ? ' (half cover, +2)' : ''}. <span class="miss">Miss.</span>`, '');
     record(`${me().name} attacked ${target.name} with ${w.n} and missed`
          + `${cover ? ', the cover saved it' : ''}.`);
@@ -2319,6 +2636,7 @@ function swing(w, target, n, of) {
   if (a.sneak && adv) { const sa = rollDice([2,6]); dmg += sa; extra += ` +${sa} sneak attack`; }
   if (me().raging && w.range === 1) { dmg += 2; extra += ' +2 rage'; }
   if (me().smiting) { const sm = rollDice([2,8]); dmg += sm; extra += ` +${sm} divine smite`; me().smiting = false; }
+  shown(true, dmg);
   target.hp -= dmg;
   say(`<b>${label}</b> at ${target.name} — ${crit ? '<span class="crit">natural 20!</span>' : `${total}${note} vs AC ${ac}`}. ` +
       `<span class="hit">${dmg} damage</span>${extra}.`, '');
@@ -2421,8 +2739,14 @@ function foeTurn() {
         const total = rollDice(f.burst.dice);
         say(`<b>${f.name} — ${f.burst.name}!</b> ${f.burst.save.toUpperCase()} save DC ${f.burst.dc}.`, 'crit');
         for (const c of caught) {
-          const sv = d(20) + saveBonus(c, f.burst.save);
+          const raw = d(20), sb = saveBonus(c, f.burst.save), sv = raw + sb;
           const dmg = sv >= f.burst.dc ? Math.floor(total / 2) : total;
+          const what = `${f.burst.save.toUpperCase()} save against ${f.burst.name}`;
+          showRoll({ who: c.name, what, rolls: [raw], keep: raw, mod: sb, target: f.burst.dc,
+                     label: `vs DC ${f.burst.dc}`, ok: sv >= f.burst.dc, words: ['HALF', 'FULL FORCE'],
+                     damage: dmg, pace: 'quick' },
+                   rollCard(c.name, what, [raw], raw, sb, `vs DC ${f.burst.dc}`, sv >= f.burst.dc,
+                            `${sv >= f.burst.dc ? 'Half' : 'Full'} · ${dmg} damage`));
           say(`${c.name} saves ${sv}: ${sv >= f.burst.dc ? 'half' : '<span class="hit">fails</span>'}, ${dmg} damage.`, '');
           record(`${f.name}'s ${f.burst.name} caught ${c.name}: ${sv >= f.burst.dc ? 'saved, half' : 'failed the save'}, ${dmg} damage.`);
           if (hurt(c, dmg)) { endFight(true); return; }
@@ -2502,6 +2826,13 @@ function hurt(c, dmg) {
 
 function deathSave() {
   const r = d(20);
+  /* the most suspense in the game: a person presses Roll, and it plays slow */
+  showRoll({ who: me().name, what: 'Death save: 10 or better', rolls: [r], keep: r, mod: 0, target: 10,
+             label: 'needs 10', ok: r >= 10,
+             words: [r === 20 ? 'BACK ON THEIR FEET' : 'SUCCESS', r === 1 ? 'TWO FAILURES' : 'FAILURE'],
+             press: !me().dmRun, pace: 'dramatic' },
+           rollCard(me().name, 'death save', [r], r, 0, 'needs 10', r >= 10,
+                    r === 20 ? 'Back up on 1 HP' : r === 1 ? 'Two failures' : r >= 10 ? 'Success' : 'Failure'));
   if (r === 20) {
     me().dying = false; me().hp = 1; me().saves = me().fails = 0;
     say(`Death save: <b>natural 20</b> — ${me().name} comes round at 1 hit point.`, 'crit');
@@ -2516,12 +2847,13 @@ function deathSave() {
     say(`<b>Three failures. ${me().name} dies.</b> Death still requires the dice to really insist.`, 'crit');
     draw();
     if (partyDown()) { endFight(true); return; }
-    setTimeout(nextSlot, 900); return;
+    whenRevealed(() => setTimeout(nextSlot, 900)); return;
   }
   if (me().saves >= 3) { me().dying = false; say(`Three successes — stable, unconscious but no longer dying.`, ''); }
   draw();
-  // the spotlight moves to the next in the order, not straight to the monsters
-  setTimeout(nextSlot, 700);
+  // the spotlight moves to the next in the order, not straight to the monsters,
+  // and only once the table has seen how the save went
+  whenRevealed(() => setTimeout(nextSlot, 700));
 }
 
 /* everyone dead or on the floor - the only way the party loses */
@@ -2560,13 +2892,14 @@ function endFight(lost) {
   draw();
   hint(lost ? 'The party fell.' : 'Fight over.');
 
-  setTimeout(() => {
+  /* the finished board stays up a moment after the last roll has been seen */
+  whenRevealed(() => setTimeout(() => {
     if (!S || S.started) return;
     S.where = 'town'; S.fight = null; SCENE = null; S.turn = null;
     draw();
-    hint('Back on the map. Talk to the Dungeon Master, or click a place to go there.');
+    hint('Back in town. Talk to the Dungeon Master, or pick a place you know.');
     askDM('', { phase: PHASE.AFTERMATH, outcome: lines });
-  }, 1800);
+  }, 1800));
 }
 
 /* ---------- campaigns, save and resume -----------------------------------
@@ -2777,6 +3110,20 @@ document.getElementById('bDash').onclick    = dash;
 document.getElementById('bSpecial').onclick = special;
 document.getElementById('bEnd').onclick     = endTurn;
 document.getElementById('bSend').onclick     = sendChat;
+/* dice settings: this screen's own preference, kept in the browser */
+function drawDicePills() {
+  document.getElementById('fastpill').textContent = FAST ? 'dice: fast' : 'dice: full';
+  document.getElementById('soundpill').textContent = SOUND ? 'sound: on' : 'sound: off';
+}
+document.getElementById('fastpill').onclick = () => {
+  FAST = !FAST; try { localStorage.setItem('hl-fast', FAST ? '1' : '0'); } catch (e) {}
+  drawDicePills();
+};
+document.getElementById('soundpill').onclick = () => {
+  SOUND = !SOUND; try { localStorage.setItem('hl-sound', SOUND ? '1' : '0'); } catch (e) {}
+  drawDicePills(); if (SOUND) tone(660, .15, 'sine', .1);
+};
+drawDicePills();
 document.getElementById('chatin').addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendChat(); }
 });
