@@ -137,6 +137,11 @@ Every request names a PHASE. Do that and nothing else.
 - **enemy** — the monsters have already moved and struck; you are given the
   result. Narrate it. No markers.
 - **between** — one line as the round turns. Keep it to a breath.
+- **free** — no fight is running; the last one is over. Nobody has a turn.
+  Talk with the table: answer what was asked, speak for the people of the
+  world, describe what is in front of them when they look. Never emit a
+  marker. The no-unsolicited-help rule still holds: do not suggest where to
+  go or what to do next unless a player asks.
 
 # The legal actions are a menu, not a suggestion
 When it is a character's turn you are given LEGAL ACTIONS: the squares they
@@ -223,8 +228,11 @@ function phaseSummary(phase, legal, outcome) {
   return out.join('\n');
 }
 
-function tableSummary(t) {
+function tableSummary(t, started) {
   if (!t) return '';
+  /* between fights there is no order and nobody is up - only the party */
+  if (!started) return ['The party:',
+    ...t.party.map(p => `  ${p.name} the ${p.archetype} — ${p.hp}/${p.max} HP, ${p.state}`)].join('\n');
   return [
     `Round ${t.round}. The order is: ${t.order.map(o => `${o.who} (${o.init})`).join(', ')}.`,
     `IT IS ${String(t.upNow).toUpperCase()}'S TURN.`,
@@ -237,6 +245,11 @@ function tableSummary(t) {
 
 function boardSummary(s) {
   if (!s || !s.chars || !s.chars.length) return 'No fight is running.';
+  if (!s.started) {
+    const foes = s.foes || [];
+    return `No fight is running. The last one is over: ${foes.filter(f => f.dead).length} enemies dead, `
+         + `${foes.filter(f => f.gone).length} fled.`;
+  }
   const active = s.chars[s.active] || s.chars[0];
   const conds = Object.keys(active.cond || {}).filter(k => active.cond[k]);
   const foes = (s.foes || []).map(f =>
@@ -374,8 +387,8 @@ export default async function handler(req, res) {
         {
           role: 'user',
           content: `CURRENT BOARD\n${boardSummary(state)}\n`
-                 + `${tableSummary(state && state.table)}\n`
-                 + `${terrainSummary(terrain)}\n\n`
+                 + `${tableSummary(state && state.table, !!(state && state.started))}\n`
+                 + `${state && state.started ? terrainSummary(terrain) : ''}\n\n`
                  + `${phaseSummary(phase, legal, outcome)}\n\n`
                  + (spoken ? `THE PLAYER SAYS: ${spoken.slice(0, 600)}`
                            : 'NOBODY SPOKE. Do the job the phase gives you.')

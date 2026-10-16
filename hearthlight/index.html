@@ -315,7 +315,7 @@
   <span class="pill" id="foespill">—</span>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h2</span>
+  <span class="pill" id="buildpill" title="build">h3</span>
 </header>
 
 <!-- the big view, for showing everyone at the table one picture -->
@@ -380,10 +380,14 @@
 
   <section class="panel">
     <h2>Setup</h2>
-    <label class="fld" for="pname">Character</label>
-    <input type="text" id="pname" value="Kira" maxlength="14">
-    <label class="fld" for="pick">Archetype</label>
-    <select id="pick"></select>
+    <!-- only for the one-character demo; hidden once a rolled party is loaded -->
+    <div id="demofields">
+      <label class="fld" for="pname">Character</label>
+      <input type="text" id="pname" value="Kira" maxlength="14">
+      <label class="fld" for="pick">Archetype</label>
+      <select id="pick"></select>
+    </div>
+    <div id="partyline" class="muted" style="display:none"></div>
     <label class="fld" for="nfoes">Enemies</label>
     <select id="nfoes">
       <option value="1">1 — Threat 1</option>
@@ -395,7 +399,7 @@
       <button id="bStart" class="primary">Start fight</button>
       <button id="bReset">Reset</button>
     </div>
-    <label>Character</label>
+    <label class="fld" for="who">You play</label>
     <select id="who"></select>
     <label class="fld" style="display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="checkbox" id="dmruns" checked> DM plays the others
@@ -720,7 +724,9 @@ function runCommand(raw) {
     return false;
   }
 
-  if (!S || !S.started) { sysLine('No fight is running — press Start fight first.'); return true; }
+  /* Between fights there is nothing to command, but the table can still talk.
+     This used to refuse every line once a fight ended, DM included. */
+  if (!S || !S.started) return false;
   if (S.turn !== 'hero') { sysLine('The enemy is moving.'); return true; }
 
   /* Naming a character who is not up used to act on whoever WAS up. Order is
@@ -773,6 +779,12 @@ function runCommand(raw) {
   }
   if (wantsAttack) {
     const num = (t.match(/#?\s?([1-4])\b/) || [])[1];
+    const spell = attackSpell();
+    if (spell) {
+      const foe = num && living().find(f => String(f.id) === num);
+      useAbility(spell, foe ? foe.name : null);
+      return true;
+    }
     const targets = living().filter(inRange);
     if (!targets.length) { attack(); return true; }
     const pick = num ? targets.find(f => String(f.id) === num) : targets[0];
@@ -833,6 +845,8 @@ function applyActions(actions) {
       sysLine(`Moved to <b>${best}</b> — ${cheb(best, named.at)} squares from ${named.name}.`);
 
     } else if (a.kind === 'attack') {
+      const spell = attackSpell();
+      if (spell) { useAbility(spell, a.target); continue; }
       const targets = living().filter(inRange);
       if (!targets.length) { sysLine('Nothing is in reach to attack.'); continue; }
       const pick = (a.target && targets.find(f =>
@@ -908,7 +922,8 @@ function terrainForDM() {
    from the rules. The DM chooses from a list instead of reasoning about
    geometry, so an illegal action is never offered rather than refused. */
 const PHASE = { AWAIT: 'awaiting', RESOLVED: 'resolved',
-                ENEMY: 'enemy', BETWEEN: 'between' };
+                ENEMY: 'enemy', BETWEEN: 'between',
+                FREE: 'free' };          /* no fight running: just talk */
 
 let OUTCOME = [];                       /* what the engine did, in plain words */
 const record = line => OUTCOME.push(line);
@@ -969,7 +984,7 @@ async function askDM(raw, opts) {
       body: JSON.stringify({
         campaign: CAMPAIGN.id,
         say: raw,
-        phase: (opts && opts.phase) || PHASE.AWAIT,
+        phase: (opts && opts.phase) || (S.started ? PHASE.AWAIT : PHASE.FREE),
         legal: legalActions(),
         outcome: (opts && opts.outcome) || [],
         /* the DM is told the map, so its description can never drift from it */
@@ -1216,9 +1231,17 @@ let WHO = null;             /* the chosen party member, or null for the demo */
 function partyOptions() {
   const sel = document.getElementById('who');
   if (!sel) return;
-  sel.innerHTML = '<option value="">The demo character (printed kit)</option>'
+  sel.innerHTML = (PARTY.length ? '<option value="">Nobody — the table plays everyone</option>'
+                                : '<option value="">The demo character (printed kit)</option>')
     + PARTY.map((p, i) => `<option value="${i}">${p.name} — ${p.archetype}</option>`).join('');
   sel.disabled = !PARTY.length;
+
+  /* With a rolled party the fight uses those characters, so the demo's
+     name and archetype boxes did nothing - and still said Kira / Vanguard. */
+  document.getElementById('demofields').style.display = PARTY.length ? 'none' : '';
+  const line = document.getElementById('partyline');
+  line.style.display = PARTY.length ? '' : 'none';
+  line.innerHTML = 'The party: ' + PARTY.map(p => `<b>${esc(p.name)}</b> (${p.archetype})`).join(', ');
 }
 
 const dieOf = s => {
@@ -1271,6 +1294,12 @@ const myAttacks = () => {
   return kitAttacks(c);
 };
 const myAbilities = () => (me() && me().kit) ? kitAbilities(me()) : [];
+
+/* What "attack" means for someone who carries no weapon: their damage spell.
+   "Kestrel attacks" was refused outright, because the Arcanist's kit has no
+   weapon in it - but Crushing Word is exactly how she attacks. */
+const attackSpell = () => myAttacks().length ? null
+  : myAbilities().find(k => k.slot !== 'Healing ability' && /^\d+d\d+$/.test(String(k.damage))) || null;
 
 /* Which weapon a swing would use right now. The engine used to pick silently
    by range, so you only learned what you had swung from the log afterwards.
@@ -1638,10 +1667,12 @@ function syncButtons() {
   const ab = document.getElementById('bAttack');
   ab.disabled = !on || S.acted;
   const w = S && S.started ? weaponNow(aimDist()) : null;
-  ab.textContent = w ? `Attack — ${w.n}` : 'Attack';
+  const sp = S && S.started ? attackSpell() : null;
+  ab.textContent = w ? `Attack — ${w.n}` : sp ? `Attack — ${sp.name}` : 'Attack';
   ab.title = w ? `${w.n}: +${w.hit} to hit, ${w.dice[0]}d${w.dice[1]}+${w.bonus}, `
                + `reach ${w.range} square${w.range === 1 ? '' : 's'}`
-               : 'Nothing in reach';
+           : sp ? `${sp.name}: ${sp.damage}, DC ${15 + sp.mod}, ${sp.range} squares, costs a Spell Use`
+           : 'Nothing in reach';
   document.getElementById('bDash').disabled    = !on || S.acted || me().dashed || e.speed0;
   document.getElementById('bSpecial').disabled = !on || !a || me().usedSpecial ||
         !['Second Wind','Rage','Divine Smite'].includes(a.special);
@@ -1695,7 +1726,7 @@ function beginSlot(first) {
     S.turn = 'foe';
     reach = {}; aiming = false; S.mode = null;
     draw(); hint('The enemy is moving…');
-    setTimeout(foeTurn, first ? 700 : 450);
+    scheduleFoes(first ? 700 : 450);
     return;
   }
   S.active = o.i;
@@ -1748,6 +1779,8 @@ function moveTo(sq) {
 }
 
 function attack() {
+  const spell = attackSpell();
+  if (spell) { useAbility(spell); return; }
   const targets = living().filter(inRange);
   if (!targets.length) {
     const near = living().reduce((m, f) => Math.min(m, cheb(me().at, f.at)), 99);
@@ -1867,8 +1900,17 @@ function endTurn() {
 }
 
 /* ---------- the goblins (one shared initiative) ------------------------ */
+/* One pending monster turn at most. Resuming twice used to queue two timers,
+   and the goblins would take two turns in a row. */
+let foeTimer = null;
+function scheduleFoes(ms) {
+  clearTimeout(foeTimer);
+  foeTimer = setTimeout(foeTurn, ms);
+}
+
 function foeTurn() {
-  if (!S || !S.started) return;
+  foeTimer = null;
+  if (!S || !S.started || S.turn !== 'foe') return;
   for (const f of living()) {
     /* A monster goes for whoever is nearest, not for whoever happens to be
        holding the spotlight. With three characters on the board that is the
@@ -1996,7 +2038,7 @@ function endFight(lost) {
     }
   }
   narrate(`It is over. ${killed} dead${ran ? `, ${ran} gone into the dark` : ''}. The room goes quiet.`);
-  draw(); hint('Fight over. Start another whenever you like.');
+  draw(); hint('Fight over. Talk to the Dungeon Master, or start another fight.');
 }
 
 /* ---------- campaigns, save and resume -----------------------------------
@@ -2010,7 +2052,8 @@ let lastSaved = '';
 let saveTimer = null;
 const REMEMBER = 'hearthlight-campaign';
 
-const snapshot = () => JSON.stringify({ ...S, chat: S.chat.filter(m => !m.pending) });
+const snapshot = () => JSON.stringify({ ...S, chat: S.chat.filter(m => !m.pending),
+                                        log: S.log.filter(e => !e.pending) });
 
 function queueSave() {
   if (!S || !CAMPAIGN) return;
@@ -2047,15 +2090,18 @@ async function load() {
     S = data.state; reach = {}; aiming = false;
     for (const c of S.chars) { c.cond = c.cond || {}; c.sit = c.sit || {}; }
     if (!S.chat) S.chat = [];
-    if (!S.log) S.log = [];
+    /* "Resumed" used to be written into the save itself, so every reopen
+       brought back all the earlier ones. It is shown, never saved, and any
+       left over from before are dropped. */
+    S.log = (S.log || []).filter(e => !/^Resumed — round/.test(e.html));
     const asset = data.scene && ART.find(a => a.kind === 'battle_map' && a.name === data.scene);
     SCENE = asset ? { asset, terrain: asset.terrain } : null;
+    S.log.unshift({ html: `Resumed — round ${S.round}.`, cls: 'd', pending: true });
     lastSaved = snapshot();
     drawLog(); draw();
-    say(`Resumed — round ${S.round}.`, 'd');
     hint(`${CAMPAIGN.name}: resumed exactly where it stopped.`);
     /* the monsters' turn was a timer when the page closed; start it again */
-    if (S.started && S.turn === 'foe') setTimeout(foeTurn, 700);
+    if (S.started && S.turn === 'foe') scheduleFoes(700);
   } catch (err) { hint(`Could not read the save (${err.message}).`); }
 }
 
