@@ -425,7 +425,7 @@
   <button class="pill link" id="voicepill" title="The Dungeon Master reads its narration aloud">DM voice: on</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h7</span>
+  <span class="pill" id="buildpill" title="build">h8</span>
   <button class="mic" id="micbtn" title="Talk to the Dungeon Master. Say &quot;mic off&quot; to put it to sleep, &quot;mic on&quot; to wake it.">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
@@ -833,7 +833,7 @@ function freshTown() {
     round: 0, turn: null, started: false, mode: null, acted: false,
     where: 'town', place: (ROLL && ROLL.start) || null, fight: null, fights: [], notes: [],
     known: ROLL && ROLL.start ? [ROLL.start] : [], met: [],
-    session: { played: 0, last: Date.now(), rested: false, finaleDone: false },
+    session: { played: 0, last: Date.now(), rested: false, finaleDone: false, begun: false },
     log: [], chat: []
   };
 }
@@ -848,6 +848,8 @@ function normalize(s) {
   s.met = s.met || [];
   s.session = s.session || { played: 0, rested: false, finaleDone: false };
   s.session.last = Date.now();
+  /* a save from before the introductions were split off is already under way */
+  if (s.session.begun === undefined) s.session.begun = true;
   s.foes = (s.foes || []).map(f => f.ac !== undefined ? f
     : { ...makeFoe('Goblin', beast('Goblin'), f.name), ...f, kind: 'Goblin', n: f.id });
   for (const c of s.chars) { c.cond = c.cond || {}; c.sit = c.sit || {}; }
@@ -1251,6 +1253,11 @@ function runCommand(raw) {
      are instant and cannot be misread; everything else is talk for the DM.
      This used to refuse every line once a fight ended, DM included. */
   if (!S) return false;
+  /* the party has been introduced; the story starts only when the table says so */
+  if (!S.started && S.session.begun === false
+      && /^(ok(ay)? )?(let'?s |we'?re ready( to)?,? |ready,? )?(begin|start)( the (story|adventure|game|session))?( please)?$/.test(t.replace(/[.!,]/g, ''))) {
+    beginStory(); return true;
+  }
   if (!S.started) {
     if (/\b(catch|get)\b[^.!?]*\bbreath\b/.test(t) || /^\s*(we\s+)?rest\b/.test(t)) {
       catchBreath(true); return true;
@@ -1482,7 +1489,9 @@ function terrainForDM() {
 const PHASE = { AWAIT: 'awaiting', RESOLVED: 'resolved',
                 ENEMY: 'enemy', BETWEEN: 'between',
                 FREE: 'free',            /* town: answer whoever spoke */
-                OPENING: 'opening',      /* the hook, once per session */
+                INTRO: 'introductions',  /* the DM introduces the party, nothing else */
+                GATHER: 'gathering',     /* introduced, story not begun: the table adds to its characters */
+                OPENING: 'opening',      /* the hook, once per session, on "begin" */
                 TRAVEL: 'travel',        /* the party has just arrived somewhere */
                 AFTERMATH: 'aftermath' };/* a fight has just ended */
 
@@ -1547,7 +1556,7 @@ async function askDM(raw, opts) {
       body: JSON.stringify({
         campaign: CAMPAIGN.id,
         say: raw,
-        phase: (opts && opts.phase) || (S.started ? PHASE.AWAIT : PHASE.FREE),
+        phase: (opts && opts.phase) || (S.started ? PHASE.AWAIT : S.session.begun === false ? PHASE.GATHER : PHASE.FREE),
         legal: legalActions(),
         outcome: (opts && opts.outcome) || [],
         /* the DM is told the map, so its description can never drift from it */
@@ -1579,7 +1588,12 @@ async function askDM(raw, opts) {
               species: c.species || '',
               uses: c.uses === undefined ? 4 : c.uses,
               conds: Object.keys(c.cond || {}).filter(k => c.cond[k]).join(' and '),
-              carries: (c.kit || []).map(k => k.name).join(', ')
+              carries: (c.kit || []).map(k => k.name).join(', '),
+              /* what an introduction can be made of: how they look, how their magic looks */
+              look: (PARTY.find(p => p.name === c.name) || {}).carried || '',
+              flair: (c.kit || []).map(k => k.flair ? `${k.name}: ${k.flair}`
+                : k.element ? `${k.name}: ${k.element}, cast with ${k.delivery || 'a gesture'}` : '')
+                .filter(Boolean).join('; ')
             }))
           },
           you: {
@@ -2991,15 +3005,30 @@ async function load() {
   } catch (err) { hint(`Could not read the save (${err.message}).`); }
 }
 
-/* The start of a session: the party at the starting place, and the DM opens
-   with the hook. Also what "New session" does, after asking. */
-function newSession() {
+/* The start of a session: the DM introduces the party, and only that. The
+   story waits until the table says "begin" (see beginStory). Also what "New
+   session" does, after asking.
+   Julian, 2026-10-24: the DM "started the story while introducing the
+   characters. It was very disjointed." So they are two turns with a stop
+   between them, and the stop is written by the page, not left to the model. */
+async function newSession() {
   clearTimeout(foeTimer);
   S = freshTown(); SCENE = null; reach = {}; aiming = false; OUTCOME = [];
   markSeats();
   document.getElementById('log').innerHTML = '';
   draw();
-  hint(`${CAMPAIGN ? CAMPAIGN.name + ': ' : ''}a new session. The Dungeon Master opens.`);
+  hint(`${CAMPAIGN ? CAMPAIGN.name + ': ' : ''}a new session. The Dungeon Master introduces the party.`);
+  await askDM('', { phase: PHASE.INTRO });
+  if (!S || S.session.begun || CHECKIN) return;
+  const ready = 'When the table is ready, say "begin".';
+  sysLine(`When the table is ready, say <b>"begin"</b>. Until then, tell the Dungeon Master anything about your characters.`);
+  whenRevealed(() => speak(ready));
+  hint(ready);
+}
+function beginStory() {
+  S.session.begun = true;
+  queueSave();
+  hint('The story begins.');
   askDM('', { phase: PHASE.OPENING });
 }
 

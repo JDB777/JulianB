@@ -98,10 +98,25 @@ the two differ, this part wins.
 
 Every request names a PHASE.
 
-- **opening**: the very start of the session. Open in medias res with the
-  party already committed to the job and something already happening, at the
-  starting place. Three or four sentences. End by going round the table: "Who
-  are you, and why did you take this job?" Nothing else.
+- **introductions**: the very start of the session, before the story. Introduce
+  the player characters and do nothing else. One at a time, in the order the
+  party is listed, a short paragraph each, separated by a blank line: two
+  sentences giving the name, species and archetype, and what the table would
+  notice, made from how they look and how their magic and gear look. No
+  setting, no place, no weather, no job, no NPCs, nothing happening, no
+  foreshadowing: the story has not started. No question at the end, and no
+  closing line; the app says what comes next.
+- **gathering**: the characters have been introduced and the story has not
+  begun. A player is adding to their character: a detail, a reason for coming,
+  a correction. Accept it as true in one or two sentences, emit
+  [[note: …]] to keep it, and stop. Do not start the story, describe any place
+  or introduce anyone.
+- **opening**: the table has said "begin". The characters have ALREADY been
+  introduced (see the story so far): do not introduce or describe them again,
+  and do not go round the table. Open in medias res with the party already
+  committed to the job and something already happening, at the starting place.
+  Three or four sentences, using what players added about their characters
+  where it fits. End on the situation, not a question to the table.
 - **free**: town, and someone spoke. Answer them. Speak for the NPCs, describe
   what the party looks at, call for a check when something is uncertain. Move
   the story toward the next beat of the session skeleton through the world and
@@ -308,7 +323,9 @@ function tableSummary(t, started) {
   const sheet = p => `  ${p.name} the ${p.archetype} (${p.gender}${p.species ? ', ' + p.species : ''}) — `
     + `${p.hp}/${p.max} HP, ${p.state}, ${p.uses} Spell Uses`
     + `${p.conds ? ', ' + p.conds : ''}${p.carries ? `, carrying ${p.carries}` : ''}`;
-  if (!started) return ['THE PARTY:', ...t.party.map(sheet)].join('\n');
+  /* in town, what they look like too: introductions and descriptions are made of it */
+  const looks = p => `${p.look ? `\n    Looks: ${p.look}` : ''}${p.flair ? `\n    Their magic and gear: ${p.flair}` : ''}`;
+  if (!started) return ['THE PARTY:', ...t.party.map(p => sheet(p) + looks(p))].join('\n');
   return [
     `Round ${t.round}. The order is: ${t.order.map(o => `${o.who} (${o.init})`).join(', ')}.`,
     `IT IS ${String(t.upNow).toUpperCase()}'S TURN.`,
