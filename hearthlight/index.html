@@ -51,6 +51,19 @@
   .pill.link { border: 0; cursor: pointer; font-family: inherit; }
   .pill.warn { background: var(--accent); color: #fff; }
 
+  /* ---- the mic: big enough to read from the sofa ---- */
+  .mic { flex: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+         font: 700 .95rem/1 inherit; padding: 8px 16px; border-radius: 99px;
+         border: 2px solid var(--line); background: var(--grid); color: var(--muted); }
+  .mic svg { width: 18px; height: 18px; }
+  .mic.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .mic.on svg { animation: micpulse 1.6s ease-in-out infinite; }
+  .mic.asleep { background: var(--panel); border-color: var(--accent); color: var(--accent); }
+  .mic.talk { background: var(--hero); border-color: var(--hero); color: var(--panel); }
+  @keyframes micpulse { 50% { transform: scale(1.18); } }
+  @media (prefers-reduced-motion: reduce) { .mic.on svg { animation: none; } }
+  .voicehelp { margin: 10px 0 0; }
+
   /* ---- the spending check-in: sits over the chat box until someone answers ---- */
   .checkin { display: none; border: 2px solid var(--accent); border-radius: 8px;
              padding: 10px 12px; background: var(--panel); }
@@ -409,9 +422,15 @@
   <span class="pill" id="foespill">—</span>
   <button class="pill link" id="fastpill" title="Full dice: every roll plays out. Fast dice: half the time.">dice: full</button>
   <button class="pill link" id="soundpill" title="Dice sounds">sound: off</button>
+  <button class="pill link" id="voicepill" title="The Dungeon Master reads its narration aloud">DM voice: on</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h6</span>
+  <span class="pill" id="buildpill" title="build">h7</span>
+  <button class="mic" id="micbtn" title="Talk to the Dungeon Master. Say &quot;mic off&quot; to put it to sleep, &quot;mic on&quot; to wake it.">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    <span id="miclabel">Mic off</span>
+  </button>
 </header>
 
 <!-- the big view, for showing everyone at the table one picture -->
@@ -433,6 +452,8 @@
       <button id="bNewCampaign" class="primary">Start</button>
     </div>
     <p class="muted" id="pickernote"></p>
+    <p class="muted voicehelp">With the mic on: say a campaign's name or number,
+      or "new campaign called …".</p>
   </div>
 </div>
 
@@ -479,7 +500,7 @@
     </div>
     <div class="chatbox">
       <textarea id="chatin" rows="2"
-        placeholder="Say what your characters do — &quot;we go to the chapel&quot;, &quot;Kestrel asks the gaoler&quot;, &quot;attack Cultist #2&quot;, or just talk."></textarea>
+        placeholder="Say (with the mic on) or type what your characters do —&quot;we go to the chapel&quot;, &quot;Kestrel asks the gaoler&quot;, &quot;attack Cultist #2&quot;, or just talk."></textarea>
       <div class="foot">
         <small id="chatnote">Enter to send · Shift+Enter for a new line</small>
         <button id="bSend" class="primary">Send</button>
@@ -1122,6 +1143,7 @@ async function playRoll(s) {
     call.hidden = false;
     btn.disabled = false;
     btn.focus();
+    speak(`${s.who.split(' ')[0]}: ${s.what}.` + (MIC === 'on' ? ' Say "roll".' : ''));
     await new Promise(res => { btn.onclick = () => { btn.disabled = true; res(); }; });
     call.hidden = true;
   }
@@ -1186,7 +1208,9 @@ const initials = n => n.replace(/[^A-Za-z0-9 #]/g,'').split(/\s+/)
    (they were running together into one block). */
 function narrate(text)  { if (!S) return;
   S.chat.push({ who: 'dm', text: esc(text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>') });
-  drawChat(); }
+  drawChat();
+  /* read aloud once the dice land, never before: the words can give a roll away */
+  whenRevealed(() => speak(text)); }
 function youSaid(text)  { if (!S) return;
   // captured now, not at render time, or the whole backlog gets relabelled;
   // in town nobody has the turn, so it is the table talking
@@ -1712,7 +1736,8 @@ function doCheck(a) {
 /* ---------- the session clock ----------------------------------------------
    Counts time the table is actually here: a minute is added only while
    someone has touched the screen in the last ten, so a page left open
-   overnight does not end up at the landing. */
+   overnight does not end up at the landing. Speaking counts too (see heard()):
+   at the TV nobody touches anything. */
 let lastInput = Date.now();
 ['keydown', 'pointerdown'].forEach(ev => document.addEventListener(ev, () => { lastInput = Date.now(); }));
 function tick() {
@@ -2998,6 +3023,8 @@ function showCheckin(c) {
     + `Keep playing? The next check-in is at $${c.after}.`;
   document.getElementById('checkin').className = 'checkin on';
   hint('Waiting on the table: keep playing?');
+  speak(`We've spent ${c.spent.toFixed(2)} dollars of the ${c.limit} for this campaign. Keep playing? `
+      + 'Say "keep playing", or "stop here".');
 }
 function hideCheckin() { document.getElementById('checkin').className = 'checkin'; }
 
@@ -3035,9 +3062,11 @@ async function openPicker() {
     const r = await fetch('/api/campaign', { cache: 'no-store' });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || r.status);
+    PICKER_LIST = data.campaigns;
+    /* numbered, so the table can say "number two" */
     list.innerHTML = data.campaigns.length
-      ? data.campaigns.map(c => `<button class="camp" data-id="${c.id}">`
-          + `<span>${esc(c.name)}</span><span class="muted">${c.last_played || 'not played yet'}</span></button>`).join('')
+      ? data.campaigns.map((c, i) => `<button class="camp" data-id="${c.id}">`
+          + `<span>${i + 1}. ${esc(c.name)}</span><span class="muted">${c.last_played || 'not played yet'}</span></button>`).join('')
       : '<p class="muted">No campaigns yet.</p>';
     list.querySelectorAll('.camp').forEach(b => b.onclick = () => {
       const c = data.campaigns.find(x => String(x.id) === b.dataset.id);
@@ -3089,6 +3118,257 @@ async function useCampaign(c) {
 
 const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
+/* ---------- voice: the table talks, the DM answers aloud -----------------
+   Julian, 2026-10-24: the game runs on a TV with no mouse and no keyboard, so
+   everything has to be sayable. The mic listens all the time; a short pause
+   ends what someone said, and it goes through the same door as the chat box.
+   The DM's narration is read aloud. While it speaks, what the mic hears is
+   mostly the DM itself, so nothing gets through then except "stop".
+   "Mic off" by voice only puts it to sleep: it then ignores everything but
+   "mic on". The button turns it off for real. Chrome and Edge only. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const TTS = window.speechSynthesis || null;
+let MIC = 'off';                      // 'off' | 'on' | 'asleep'
+let rec = null, recLive = false, heardBuf = '', heardTimer = null;
+let VOICE = true, SPEAKING = 0, spokeUntil = 0, nowSaying = '', lastSaid = '';
+let SPEECH_GEN = 0;                    // bumped by hush(), so stale sentence timers do nothing
+let PICKER_LIST = [], confirmNew = 0;
+try { VOICE = localStorage.getItem('hl-voice') !== '0'; } catch (e) {}
+
+function drawMic() {
+  const b = document.getElementById('micbtn'), l = document.getElementById('miclabel');
+  const talk = MIC === 'on' && SPEAKING > 0;
+  b.className = 'mic' + (talk ? ' talk' : MIC === 'on' ? ' on' : MIC === 'asleep' ? ' asleep' : '');
+  l.textContent = !SR ? 'No mic here — use Chrome or Edge'
+    : talk ? 'DM speaking — say "stop"'
+    : MIC === 'on' ? 'Mic on — listening'
+    : MIC === 'asleep' ? 'Mic asleep — say "mic on"' : 'Mic off';
+  document.getElementById('voicepill').textContent = VOICE ? 'DM voice: on' : 'DM voice: off';
+}
+
+function setMic(m) {
+  if (!SR) { drawMic(); return; }
+  MIC = m;
+  try { localStorage.setItem('hl-mic', m); } catch (e) {}
+  clearTimeout(heardTimer); heardBuf = '';
+  if (m === 'off') { if (rec) try { rec.abort(); } catch (e) {} }
+  else listen();
+  drawMic();
+}
+
+function listen() {
+  if (!rec) {
+    rec = new SR();
+    rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US';
+    rec.onresult = ev => {
+      let fin = '', part = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) fin += r[0].transcript; else part += r[0].transcript;
+      }
+      heard(fin.trim(), part.trim());
+    };
+    /* the browser ends a listening session on silence or a hiccup; keep it going */
+    rec.onend = () => { recLive = false; if (MIC !== 'off') setTimeout(recGo, 300); };
+    rec.onerror = ev => {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        setMic('off');
+        hint('The microphone is blocked. Allow it from the icon in the address bar, then press Mic.');
+      }
+    };
+  }
+  recGo();
+}
+function recGo() {
+  if (recLive || MIC === 'off') return;
+  try { rec.start(); recLive = true; } catch (e) { /* already running */ }
+}
+
+function heard(fin, part) {
+  lastInput = Date.now();                           // the session clock: someone is here
+  /* the DM's own voice, coming back in through the mic */
+  if (SPEAKING > 0 || Date.now() < spokeUntil) {
+    const t = fin.toLowerCase().replace(/[.,!?]/g, '').trim();
+    if (/^(ok |okay )?(stop|quiet|hush|skip|enough|stop talking|shut up)$/.test(t)
+        && !nowSaying.toLowerCase().includes(t)) hush();
+    return;
+  }
+  if (MIC === 'asleep') {
+    if (/\b(mic|microphone) on\b|\bstart listening\b|\bwake up\b/i.test(fin)) {
+      setMic('on'); speak('Listening.');
+    }
+    return;
+  }
+  if (fin) heardBuf = (heardBuf + ' ' + fin).trim();
+  /* what was heard shows in the chat box as it comes, so the table can see it */
+  const box = document.getElementById('chatin');
+  box.value = (heardBuf + ' ' + part).trim();
+  document.getElementById('chatnote').textContent = 'Hearing you…';
+  clearTimeout(heardTimer);
+  if (heardBuf || part) heardTimer = setTimeout(flushHeard, part ? 1800 : 1100);
+}
+
+function flushHeard() {
+  const text = heardBuf.trim();
+  const box = document.getElementById('chatin');
+  if (!text) { box.value = ''; return; }
+  if (voiceCommand(text)) { heardBuf = ''; box.value = ''; resetNote(); return; }
+  /* the dice first, or the DM is still answering: it waits in the box, and goes after */
+  if (HOLD || dmBusy) { heardTimer = setTimeout(flushHeard, 600); return; }
+  heardBuf = '';
+  box.value = text;
+  resetNote();
+  sendChat();
+}
+const resetNote = () => { document.getElementById('chatnote').textContent = 'Enter to send · Shift+Enter for a new line'; };
+
+const NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+               first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+
+/* Things the page does itself when said. Everything else is talk for the DM.
+   True when it handled the line. */
+function voiceCommand(raw) {
+  const t = raw.toLowerCase().replace(/[.,!?"]/g, '').replace(/\s+/g, ' ').trim();
+  const short = t.split(' ').length <= 6;
+
+  if (/\b(mic|microphone) off\b|\bstop listening\b/.test(t)) {
+    setMic('asleep'); speak('Mic is asleep. Say "mic on" to wake me.'); return true;
+  }
+  if (short && /\b(dm |dungeon master )?voice off\b|\bstop reading\b/.test(t)) { setVoice(false); return true; }
+  if (short && /\b(dm |dungeon master )?voice on\b|\bread (it )?aloud\b/.test(t)) { setVoice(true); speak('Voice on.'); return true; }
+  if (short && /^(repeat( that)?|say (that|it) again|again|what did (he|she|they|you|the dm) say)$/.test(t)) {
+    speak(lastSaid || 'Nothing yet.'); return true;
+  }
+
+  /* the dice are waiting on the table */
+  const call = document.getElementById('dcall');
+  if (!call.hidden && short && /\b(roll|rolls|rolling|throw|do it|go)\b/.test(t)) {
+    document.getElementById('dcallbtn').click(); return true;
+  }
+  if (document.getElementById('spot').classList.contains('on') && short
+      && /\b(close|back|done|hide|dismiss|ok|okay)\b/.test(t)) { closeSpot(); return true; }
+
+  if (CHECKIN) {
+    if (/\b(keep (playing|going)|carry on|continue|yes)\b/.test(t)) keepGoing();
+    else if (/\b(stop here|stop|no)\b/.test(t)) stopHere();
+    else speak('Before anything else: keep playing, or stop here?');
+    return true;
+  }
+
+  if (document.getElementById('picker').classList.contains('on')) return pickByVoice(t);
+
+  if (confirmNew) {
+    const yes = Date.now() - confirmNew < 20000 && /\byes\b/.test(t);
+    confirmNew = 0;
+    if (yes) { newSession(); return true; }
+    if (/^(no|cancel|never mind)\b/.test(t)) { sysLine('Kept the session.'); return true; }
+  }
+  if (short && /\b(switch|change|another|other|pick a|choose a|open a) campaigns?\b/.test(t)) { openPicker(); return true; }
+  if (short && /^(start (a )?)?new session$/.test(t)) {
+    if (!CAMPAIGN) { openPicker(); return true; }
+    confirmNew = Date.now();
+    sysLine('Throw this session away and start again from the opening? Say <b>"yes, new session"</b>.');
+    speak('Throw this session away and start again from the opening? Say "yes, new session".');
+    return true;
+  }
+  const fight = short && S && !S.started && t.match(/^start (?:a |an )?(warm ?up|standard|hard|finale)? ?fight\b/);
+  if (fight) {
+    const size = (fight[1] || 'standard').replace(/warm ?up/, 'warmup');
+    startFight(size, S.place); return true;
+  }
+  if (short && /^(fast|quick) dice$/.test(t)) { if (!FAST) document.getElementById('fastpill').click(); return true; }
+  if (short && /^(full|slow) dice$/.test(t)) { if (FAST) document.getElementById('fastpill').click(); return true; }
+  if (short && /^sound (on|off)$/.test(t)) {
+    if ((t.endsWith('on')) !== SOUND) document.getElementById('soundpill').click(); return true;
+  }
+  if (short && /^save( the)? game$/.test(t)) { save(true); return true; }
+  return false;
+}
+
+/* the campaign list, by voice: "number two", "the undead rose", "new campaign called …" */
+function pickByVoice(t) {
+  const made = t.match(/\bnew campaign(?: called| named)?\s+(.+)$/);
+  if (made) {
+    const name = made[1].replace(/\b\w/g, ch => ch.toUpperCase());
+    document.getElementById('newcampaign').value = name;
+    newCampaign(); return true;
+  }
+  const n = (t.match(/\b(\d{1,2})\b/) || [])[1] || NUMS[(t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth)\b/) || [])[1]];
+  let c = n ? PICKER_LIST[+n - 1] : null;
+  if (!c) {
+    /* the campaign sharing the most words with what was said */
+    const words = t.split(' ').filter(w => w.length > 2 && !/^(the|and|play|open|load|lets|let's|campaign)$/.test(w));
+    let best = 0;
+    for (const x of PICKER_LIST) {
+      const hit = words.filter(w => x.name.toLowerCase().includes(w)).length;
+      if (hit > best) { best = hit; c = x; }
+    }
+  }
+  if (c) { useCampaign({ id: c.id, name: c.name }); return true; }
+  if (CAMPAIGN && /\b(close|cancel|back|never mind)\b/.test(t)) {
+    document.getElementById('picker').className = 'picker'; return true;
+  }
+  speak('Say a campaign\'s name or number, or "new campaign called", and a name.');
+  return true;
+}
+
+/* The DM, read aloud. One sentence at a time: Chrome cuts off anything that
+   runs past about fifteen seconds. */
+let VOICE_PICK;
+function narratorVoice() {
+  if (VOICE_PICK) return VOICE_PICK;
+  const vs = TTS.getVoices().filter(v => /^en/i.test(v.lang));
+  VOICE_PICK = vs.find(v => /natural/i.test(v.name) && /(guy|ryan|davis|andrew|brian|christopher)/i.test(v.name))
+    || vs.find(v => /natural/i.test(v.name))
+    || vs.find(v => /google uk english male/i.test(v.name))
+    || vs.find(v => /google/i.test(v.name)) || vs[0] || null;
+  return VOICE_PICK;
+}
+function speak(text) {
+  try {
+    if (!VOICE || !TTS) return;
+    const plain = String(text).replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ')
+      .replace(/[*_#`~\[\]]/g, '').replace(/\s+/g, ' ').trim();
+    if (!plain) return;
+    lastSaid = plain;
+    const parts = plain.match(/[^.!?…]+[.!?…]+["'”’)]*|[^.!?…]+$/g) || [plain];
+    for (const p of parts) {
+      const u = new SpeechSynthesisUtterance(p.trim());
+      const v = narratorVoice(); if (v) u.voice = v;
+      SPEAKING++;
+      u.onstart = () => { nowSaying = u.text; drawMic(); };
+      /* Chrome sometimes never says a sentence has ended, and then the mic
+         would ignore the table for good: give each one a generous deadline */
+      let done = false; const gen = SPEECH_GEN;
+      const dog = setTimeout(() => u.onend(), 8000 + 120 * u.text.length);
+      u.onend = u.onerror = () => {
+        if (done || gen !== SPEECH_GEN) return;
+        done = true; clearTimeout(dog);
+        SPEAKING = Math.max(0, SPEAKING - 1);
+        if (!SPEAKING) {
+          nowSaying = ''; spokeUntil = Date.now() + 700;
+          /* throw away whatever the mic caught of the DM's own voice */
+          if (rec && recLive) try { rec.abort(); } catch (e) {}
+          drawMic();
+        }
+      };
+      TTS.speak(u);
+    }
+    drawMic();
+  } catch (e) { console.error('voice', e); }
+}
+function hush() {
+  SPEECH_GEN++;
+  if (TTS) TTS.cancel();
+  SPEAKING = 0; nowSaying = ''; spokeUntil = Date.now() + 500; drawMic();
+}
+function setVoice(on) {
+  VOICE = on; try { localStorage.setItem('hl-voice', on ? '1' : '0'); } catch (e) {}
+  if (!on) hush();
+  drawMic();
+}
+if (TTS) TTS.onvoiceschanged = () => { VOICE_PICK = null; };
+
 /* ---------- wiring ----------------------------------------------------- */
 document.getElementById('pick').innerHTML = Object.keys(ARCHETYPES).map(k => {
   const a = ARCHETYPES[k];
@@ -3127,6 +3407,18 @@ drawDicePills();
 document.getElementById('chatin').addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendChat(); }
 });
+/* the mic: the button is a real on/off; the press also unlocks the browser's speech */
+document.getElementById('micbtn').onclick = () => {
+  if (MIC === 'off') { setMic('on'); speak('Listening.'); } else { setMic('off'); hush(); }
+};
+document.getElementById('voicepill').onclick = () => { setVoice(!VOICE); if (VOICE) speak('Voice on.'); };
+/* a screen that was listening when it was closed listens again when opened:
+   at the TV there is nobody to press the button */
+(function () {
+  let m = 'off';
+  try { m = localStorage.getItem('hl-mic') || 'off'; } catch (e) {}
+  if (m === 'on' || m === 'asleep') setMic(m); else drawMic();
+})();
 document.getElementById('bSave').onclick    = () => save(true);
 document.getElementById('bLoad').onclick    = load;
 document.getElementById('bKeepGoing').onclick   = keepGoing;
