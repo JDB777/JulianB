@@ -102,7 +102,10 @@ Every request names a PHASE.
   the player characters and do nothing else. One at a time, in the order the
   party is listed, a short paragraph each, separated by a blank line: two
   sentences giving the name, species and archetype, and what the table would
-  notice, made from how they look and how their magic and gear look. No
+  notice, made from how they look and how their magic and gear look. Each
+  paragraph is read aloud while that character's portrait fills the screen,
+  so present them like a herald presenting champions at court: ceremonious,
+  vivid, a little grand, never jokey. No
   setting, no place, no weather, no job, no NPCs, nothing happening, no
   foreshadowing: the story has not started. No question at the end, and no
   closing line; the app says what comes next.

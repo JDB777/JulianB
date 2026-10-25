@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hearthlight</title>
+<!-- the pageant's lettering; the page still works in Georgia without it -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap">
 <style>
   :root {
     --bg: #f6f3ee;      --panel: #fffdf9;   --ink: #241f1a;
@@ -142,6 +146,106 @@
                  color: var(--muted); cursor: pointer; background: none;
                  border: none; padding: 6px 10px; }
   .spot .close:hover { color: var(--ink); }
+
+  /* ---- the pageant: a new session opens like a curtain going up ----
+     Always dark and gold, whatever the theme: it is a stage, not a panel. */
+  .pageant { position: fixed; inset: 0; z-index: 60; display: none; overflow: hidden;
+             color: #f1e4cc; opacity: 0; transition: opacity 1.3s ease;
+             background: radial-gradient(ellipse at 50% 42%, #33220f 0%, #120c07 55%, #050302 100%);
+             font-family: "Cormorant Garamond", Georgia, serif; cursor: default; }
+  .pageant.on { display: block; }  .pageant.show { opacity: 1; }
+  .pageant::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+                    box-shadow: inset 0 0 18vmin 6vmin #000; }
+  .ember { position: absolute; bottom: -2vh; width: var(--s); height: var(--s); border-radius: 50%;
+           background: radial-gradient(circle, #ffd28a 0%, #ff8a2a 45%, transparent 70%);
+           left: var(--x); opacity: 0; animation: rise var(--d) linear var(--w) infinite; }
+  @keyframes rise { 0% { transform: translate(0, 0); opacity: 0; }
+                    12% { opacity: .9; } 70% { opacity: .55; }
+                    100% { transform: translate(var(--drift), -108vh); opacity: 0; } }
+  .pg-scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+              padding: 5vh 6vw; gap: 5vw; opacity: 0; visibility: hidden;
+              transition: opacity 1.2s ease, visibility 0s linear 1.2s; }
+  .pg-scene.live { opacity: 1; visibility: visible; transition: opacity 1.2s ease; }
+  .gild { background: linear-gradient(180deg, #fff3d6 0%, #e9c27a 45%, #a8742f 100%);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+          font-family: Cinzel, "Trajan Pro", Georgia, serif; font-weight: 600;
+          filter: drop-shadow(0 2px 14px rgba(255,170,70,.25)); }
+  .pg-small { font-family: Cinzel, Georgia, serif; text-transform: uppercase;
+              letter-spacing: .32em; font-size: clamp(.7rem, 1.1vw, 1.1rem); color: #c9a46a; }
+  .pg-orn { display: flex; align-items: center; gap: 14px; color: #c9a46a; width: min(420px, 60vw); }
+  .pg-orn::before, .pg-orn::after { content: ''; flex: 1; height: 1px;
+                                    background: linear-gradient(90deg, transparent, #c9a46a, transparent); }
+  /* the title card */
+  .pg-title { flex-direction: column; text-align: center; gap: 2.4vh; }
+  .pg-title h1 { margin: 0; font-size: clamp(2.4rem, 7.2vw, 8rem); line-height: 1.05;
+                 letter-spacing: .5em; transition: letter-spacing 3.2s cubic-bezier(.2,.7,.2,1); }
+  .pg-title.live h1 { letter-spacing: .06em; }
+  .pg-title .pg-call { font-style: italic; font-size: clamp(1.1rem, 2vw, 2rem); color: #e8d6b4; }
+  /* one hero */
+  .pg-frame { position: relative; flex: none; height: min(78vh, 118vw); aspect-ratio: 886 / 1100;
+              border: 1px solid #c9a46a; border-radius: 4px; overflow: hidden;
+              box-shadow: 0 0 0 7px #140d07, 0 0 0 8px rgba(201,164,106,.45),
+                          0 30px 90px #000, 0 0 140px rgba(255,150,60,.18);
+              opacity: 0; transform: translateY(3vh) scale(.97);
+              transition: opacity 1.6s ease, transform 2.2s cubic-bezier(.2,.7,.2,1); }
+  .pg-frame img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.1); }
+  .live .pg-frame { opacity: 1; transform: none; }
+  .live .pg-frame img { animation: drift 22s ease-out forwards; }
+  @keyframes drift { from { transform: scale(1.1); } to { transform: scale(1); } }
+  .pg-text { max-width: 36rem; display: flex; flex-direction: column; gap: 2vh; }
+  .pg-text > * { opacity: 0; transform: translateY(1.2vh); transition: opacity 1.2s ease, transform 1.4s ease; }
+  .live .pg-text > * { opacity: 1; transform: none; }
+  .live .pg-text > :nth-child(2) { transition-delay: .7s; }
+  .live .pg-text > :nth-child(3) { transition-delay: 1.1s; }
+  .live .pg-text > :nth-child(4) { transition-delay: 1.3s; }
+  .live .pg-text > :nth-child(5) { transition-delay: 2s; }
+  .pg-name { margin: 0; font-size: clamp(2rem, 4.6vw, 5.2rem); line-height: 1.05; }
+  .pg-sub { font-family: Cinzel, Georgia, serif; letter-spacing: .2em; text-transform: uppercase;
+            font-size: clamp(.8rem, 1.35vw, 1.4rem); color: #d9b678; }
+  .pg-words { margin: 0; font-size: clamp(1.05rem, 1.9vw, 2.05rem); line-height: 1.45; color: #efe2c8; }
+  /* the company, assembled */
+  .pg-company { flex-direction: column; gap: 3.2vh; text-align: center; }
+  .pg-company h2 { margin: 0; font-size: clamp(1.6rem, 3.6vw, 4rem); }
+  .pg-row { display: flex; gap: 3vw; justify-content: center; flex-wrap: wrap; }
+  .pg-row figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1.4vh; }
+  .pg-row .pg-frame { height: min(46vh, 52vw); }
+  .live .pg-row figure:nth-child(2) .pg-frame { transition-delay: .35s; }
+  .live .pg-row figure:nth-child(3) .pg-frame { transition-delay: .7s; }
+  .live .pg-row figure:nth-child(4) .pg-frame { transition-delay: 1.05s; }
+  .pg-row figcaption { font-family: Cinzel, Georgia, serif; font-size: clamp(.85rem, 1.5vw, 1.5rem);
+                       color: #ead2a2; letter-spacing: .08em; }
+  .pg-row figcaption span { display: block; font-size: .72em; color: #b8955c; letter-spacing: .18em;
+                            text-transform: uppercase; }
+  .pg-ready { font-family: Cinzel, Georgia, serif; font-size: clamp(1rem, 2.1vw, 2.2rem);
+              color: #fff0d0; animation: beckon 2.8s ease-in-out infinite; }
+  .pg-ready b { color: #ffcf7a; }
+  @keyframes beckon { 50% { text-shadow: 0 0 22px rgba(255,190,90,.75); } }
+  .pg-cap { min-height: 1.5em; max-width: 60rem; font-style: italic;
+            font-size: clamp(1rem, 1.7vw, 1.8rem); color: #e2cfaa; }
+  /* the curtain call */
+  .pg-close h1 { margin: 0; font-size: clamp(2.4rem, 7vw, 7.6rem); text-align: center;
+                 transform: scale(.94); transition: transform 3s ease-out; }
+  .pg-close.live h1 { transform: scale(1.02); }
+  /* the company leaves the stage before the words arrive, not through them */
+  .pg-close.live { transition: opacity 1.4s ease 1s; }
+  .pg-skip { position: absolute; bottom: 2.4vh; left: 0; right: 0; text-align: center;
+             font-size: clamp(.7rem, 1vw, 1rem); color: rgba(201,164,106,.55);
+             letter-spacing: .12em; z-index: 2; }
+  @media (max-width: 760px) {
+    .pg-hero { flex-direction: column; gap: 3vh; padding: 4vh 16px; text-align: center; }
+    .pg-hero .pg-frame { height: 46vh; }
+    .pg-hero .pg-orn { margin: 0 auto; }
+    /* the company stays side by side, or the call to begin falls off the screen */
+    .pg-company { padding: 4vh 16px; }
+    .pg-row { flex-wrap: nowrap; gap: 10px; }
+    .pg-row .pg-frame { height: auto; width: 28vw; }
+    .pg-row figcaption { font-size: .72rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ember { display: none; }
+    .live .pg-frame img { animation: none; transform: none; }
+    .pg-title h1, .pg-title.live h1 { letter-spacing: .06em; transition: none; }
+  }
   .boardpane { min-width: 0; min-height: 0; display: flex; flex-direction: column;
                align-items: center; justify-content: center; gap: 6px; }
   .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .68rem;
@@ -425,7 +529,7 @@
   <button class="pill link" id="voicepill" title="The Dungeon Master reads its narration aloud">DM voice: on</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h9</span>
+  <span class="pill" id="buildpill" title="build">h10</span>
   <button class="mic" id="micbtn" title="Talk to the Dungeon Master. Say &quot;mic off&quot; to put it to sleep, &quot;mic on&quot; to wake it.">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
@@ -439,6 +543,21 @@
   <img alt="">
   <div class="who"></div>
   <div class="meta"></div>
+</div>
+
+<!-- the pageant: a new session's title card, each hero in turn, then the company -->
+<div class="pageant" id="pageant" aria-live="polite">
+  <div id="embers"></div>
+  <section class="pg-scene pg-title" id="pgtitle">
+    <div class="pg-small">A new tale is about to be told</div>
+    <h1 class="gild" id="pgcampaign"></h1>
+    <div class="pg-orn">&#9670;</div>
+    <div class="pg-call">Gather round the hearth.</div>
+  </section>
+  <section class="pg-scene pg-hero" id="pghero"></section>
+  <section class="pg-scene pg-company" id="pgcompany"></section>
+  <section class="pg-scene pg-close" id="pgclose"><h1 class="gild">Let the tale begin</h1></section>
+  <div class="pg-skip" id="pgskip">Say “next” to move on</div>
 </div>
 
 <!-- choose a campaign: the save file every game belongs to -->
@@ -1211,6 +1330,10 @@ const initials = n => n.replace(/[^A-Za-z0-9 #]/g,'').split(/\s+/)
 function narrate(text)  { if (!S) return;
   S.chat.push({ who: 'dm', text: esc(text).replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>') });
   drawChat();
+  LAST_DM = text;
+  /* the pageant reads the introductions itself, one hero at a time */
+  if (PG.quiet) return;
+  if (PG.stage === 'company') pgCaption(text);
   /* read aloud once the dice land, never before: the words can give a roll away */
   whenRevealed(() => speak(text)); }
 function youSaid(text)  { if (!S) return;
@@ -3005,6 +3128,228 @@ async function load() {
   } catch (err) { hint(`Could not read the save (${err.message}).`); }
 }
 
+/* ---------- the pageant ------------------------------------------------
+   Julian, 2026-10-24: "more pomp and circumstance when a new game is started
+   ... make the people playing feel that something special is happening."
+   So a new session takes over the whole screen: a title card while the DM
+   writes, then each hero's portrait in turn while their introduction is read
+   aloud, then the company together until the table says "begin". Every wait
+   in it can be cut short ("next", a click), and "begin" ends it at any point.
+   PG.gen is bumped on every open and close, so a ceremony that was ended
+   cannot carry on in the background. */
+const PG = { on: false, quiet: false, stage: '', gen: 0, skip: null };
+let LAST_DM = '';
+
+/* the painted portrait, never the token: findArt's exact-name match picks the
+   token ("kestrelsilverleaf") over "kestrelsilverleafthearcanist" */
+const heroArt = c => {
+  const k = artKey(c.name);
+  return (k && ART.find(a => a.kind === 'player_portrait' && a.key.startsWith(k))) || null;
+};
+const pgSet = (id, live) => document.getElementById(id).classList.toggle('live', live);
+const pgScenes = ['pgtitle', 'pghero', 'pgcompany', 'pgclose'];
+function pgShowOnly(id) { pgScenes.forEach(s => pgSet(s, s === id)); PG.stage = id.slice(2); }
+
+/* a wait that "next" or a click can cut short */
+function pgWait(ms) {
+  return new Promise(r => {
+    const t = setTimeout(done, ms);
+    function done() { clearTimeout(t); if (PG.skip === done) PG.skip = null; r(); }
+    PG.skip = done;
+  });
+}
+function pgSkip() { hush(); if (PG.skip) PG.skip(); }
+
+/* read a passage and wait until it has been read; with the voice off, wait
+   about as long as it takes to read it on screen */
+async function pgSay(text, gen) {
+  if (!VOICE || !TTS) return pgWait(2500 + 55 * text.length);
+  let skipped = false;
+  const cut = new Promise(r => { PG.skip = () => { skipped = true; PG.skip = null; r(); }; });
+  speak(text);
+  const t0 = Date.now();
+  while (!skipped && gen === PG.gen) {
+    const r = await Promise.race([sleep(150).then(() => false), cut.then(() => true)]);
+    if (r) break;
+    /* a moment for the engine to start before silence counts as finished */
+    if (Date.now() - t0 > 600 && SPEAKING === 0) break;
+  }
+  if (PG.skip && !skipped) PG.skip = null;
+}
+
+/* Music, made on the spot like the dice sounds. It plays with the DM's voice,
+   not the dice "sound" switch: the ceremony is the voice's moment. */
+function pgCtx() {
+  if (!VOICE) return null;
+  try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  if (AC.state === 'suspended') AC.resume().catch(() => {});
+  return AC;
+}
+/* a horn: two detuned saws through a soft filter, swelling in */
+function horn(a, f, t, dur, vol) {
+  const g = a.createGain(), lp = a.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.setValueAtTime(700, t);
+  lp.frequency.linearRampToValueAtTime(2000, t + .15); lp.frequency.linearRampToValueAtTime(1100, t + dur);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .06);
+  g.gain.setValueAtTime(vol, t + dur * .7); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  lp.connect(g).connect(a.destination);
+  for (const d of [-6, 6]) {
+    const o = a.createOscillator(); o.type = 'sawtooth'; o.detune.value = d;
+    o.frequency.setValueAtTime(f, t); o.connect(lp); o.start(t); o.stop(t + dur + .05);
+  }
+}
+function drum(a, t, vol) {
+  const o = a.createOscillator(), g = a.createGain();
+  o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(48, t + .5);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + .9);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + 1);
+}
+const NOTE = n => 440 * Math.pow(2, (n - 69) / 12);
+function pgFanfare(big) {
+  const a = pgCtx(); if (!a) return;
+  const t = a.currentTime + .05;
+  /* D major: a call, an answer, and the held chord */
+  const bars = big
+    ? [[[62, 69, 74], 0, .32], [[62, 69, 74], .36, .18], [[67, 71, 74], .6, .5], [[69, 73, 76], 1.15, .5], [[62, 66, 69, 74], 1.75, 2.6]]
+    : [[[62, 69, 74], 0, .45], [[67, 71, 74], .5, .45], [[62, 66, 69, 74], 1.0, 2.2]];
+  for (const [chord, at, dur] of bars) {
+    chord.forEach(n => horn(a, NOTE(n), t + at, dur, .035));
+    drum(a, t + at, .35);
+  }
+}
+/* under each hero: a low held fifth and one bell, a different key for each */
+function pgSwell(i) {
+  const a = pgCtx(); if (!a) return;
+  const t = a.currentTime + .05, root = [50, 55, 57, 52, 53][i % 5];
+  for (const n of [root, root + 7, root + 12]) {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle'; o.frequency.value = NOTE(n);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.03, t + 1.2);
+    g.gain.exponentialRampToValueAtTime(.0001, t + 7);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + 7.1);
+  }
+  const o = a.createOscillator(), g = a.createGain();
+  o.frequency.value = NOTE(root + 31);
+  g.gain.setValueAtTime(.05, t + .9); g.gain.exponentialRampToValueAtTime(.0001, t + 3.5);
+  o.connect(g).connect(a.destination); o.start(t + .9); o.stop(t + 3.6);
+}
+
+function pgEmbers() {
+  const box = document.getElementById('embers');
+  if (box.childElementCount) return;
+  box.innerHTML = Array.from({ length: 30 }, () => {
+    const r = Math.random;
+    return `<i class="ember" style="--x:${(r() * 100).toFixed(1)}%;--s:${(3 + r() * 5).toFixed(1)}px;`
+         + `--d:${(9 + r() * 10).toFixed(1)}s;--w:${(-r() * 18).toFixed(1)}s;`
+         + `--drift:${((r() - .5) * 18).toFixed(1)}vw"></i>`;
+  }).join('');
+}
+
+/* the curtain goes up: the title card, read out while the DM writes */
+function pgOpen() {
+  const el = document.getElementById('pageant');
+  const gen = ++PG.gen;
+  PG.on = true;
+  pgEmbers();
+  const name = CAMPAIGN ? CAMPAIGN.name : 'Hearthlight';
+  document.getElementById('pgcampaign').textContent = name;
+  document.getElementById('pgskip').hidden = false;
+  el.classList.add('on');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (gen !== PG.gen) return;
+    el.classList.add('show');
+    pgShowOnly('pgtitle');
+  }));
+  pgFanfare(true);
+  setTimeout(() => { if (gen === PG.gen) speak(`Gather round, friends. A new tale begins: ${name}.`); }, 1400);
+  return gen;
+}
+
+function pgHeroHTML(c, words) {
+  const a = heroArt(c);
+  const n = S.chars.length;
+  return `${a ? `<div class="pg-frame"><img src="assets/${a.view}" alt="${esc(c.name)}"></div>` : ''}
+    <div class="pg-text">
+      <div class="pg-small">${n > 1 ? `The company · ${S.chars.indexOf(c) + 1} of ${n}` : 'The hero'}</div>
+      <h1 class="pg-name gild">${esc(c.name)}</h1>
+      <div class="pg-sub">${esc(c.species || '')}${c.species ? ' · ' : ''}the ${esc(c.archetype)}</div>
+      <div class="pg-orn">&#9670;</div>
+      <p class="pg-words">${esc(words)}</p>
+    </div>`;
+}
+
+/* each hero in turn: the portrait arrives, their introduction is read, a breath */
+async function pgHeroes(text, gen) {
+  const paras = String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  const hero = document.getElementById('pghero');
+  for (const [i, c] of S.chars.entries()) {
+    if (gen !== PG.gen) return;
+    const first = c.name.split(' ')[0].toLowerCase();
+    const words = paras.find(p => p.toLowerCase().includes(first))
+      || (paras.length === S.chars.length ? paras[i] : '')
+      || `${c.name}, ${c.species ? c.species + ', ' : ''}the ${c.archetype}.`;
+    pgSet('pghero', false);
+    if (PG.stage === 'hero') await sleep(1000);        // let the last one fade first
+    if (gen !== PG.gen) return;
+    hero.innerHTML = pgHeroHTML(c, words);
+    void hero.offsetWidth;                              // so the entrance plays
+    pgShowOnly('pghero');
+    pgSwell(i);
+    await pgWait(1500);
+    if (gen !== PG.gen) return;
+    await pgSay(words, gen);
+    if (gen !== PG.gen) return;
+    await pgWait(1300);
+  }
+}
+
+/* the company together, waiting for "begin" */
+function pgCompany() {
+  const box = document.getElementById('pgcompany');
+  box.innerHTML = `<div class="pg-small">${esc(CAMPAIGN ? CAMPAIGN.name : 'Hearthlight')}</div>
+    <h2 class="gild">The company is assembled</h2>
+    <div class="pg-row">${S.chars.map(c => {
+      const a = heroArt(c);
+      return `<figure>${a ? `<div class="pg-frame"><img src="assets/${a.view}" alt=""></div>` : ''}
+        <figcaption>${esc(c.name)}<span>the ${esc(c.archetype)}</span></figcaption></figure>`;
+    }).join('')}</div>
+    <div class="pg-ready">When the table is ready, say <b>“begin”</b></div>
+    <div class="pg-cap" id="pgcap">Until then, tell the Dungeon Master anything about your characters.</div>`;
+  document.getElementById('pgskip').hidden = true;
+  pgSet('pghero', false);
+  setTimeout(() => { if (PG.on) pgShowOnly('pgcompany'); }, PG.stage === 'hero' ? 1000 : 0);
+  pgFanfare(false);
+}
+/* what the DM says to the gathered company shows under them */
+function pgCaption(text) {
+  const el = document.getElementById('pgcap');
+  if (el) el.textContent = text;
+}
+
+/* the curtain comes down; with `grand`, on "Let the tale begin" */
+function pgClose(grand) {
+  if (!PG.on) return;
+  const gen = ++PG.gen;
+  PG.quiet = false;
+  if (PG.skip) PG.skip();
+  const el = document.getElementById('pageant');
+  const end = () => {
+    if (gen !== PG.gen) return;
+    el.classList.remove('show');
+    setTimeout(() => {
+      if (gen !== PG.gen) return;
+      el.classList.remove('on'); PG.on = false; PG.stage = '';
+      pgScenes.forEach(s => pgSet(s, false));
+    }, 1300);
+  };
+  if (!grand) { end(); return; }
+  hush();
+  document.getElementById('pgskip').hidden = true;
+  pgShowOnly('pgclose');
+  pgFanfare(true);
+  setTimeout(end, 3600);
+}
+
 /* The start of a session: the DM introduces the party, and only that. The
    story waits until the table says "begin" (see beginStory). Also what "New
    session" does, after asking.
@@ -3018,14 +3363,31 @@ async function newSession() {
   document.getElementById('log').innerHTML = '';
   draw();
   hint(`${CAMPAIGN ? CAMPAIGN.name + ': ' : ''}a new session. The Dungeon Master introduces the party.`);
+  try { await ART_READY; } catch (e) {}
+  /* the ceremony needs the portraits; without them it is the plain chat */
+  const grand = S.chars.some(c => heroArt(c));
+  const gen = grand ? pgOpen() : 0;
+  const t0 = Date.now();
+  LAST_DM = '';
+  PG.quiet = grand;
   await askDM('', { phase: PHASE.INTRO });
-  if (!S || S.session.begun || CHECKIN) return;
+  PG.quiet = false;
+  if (!S || S.session.begun) return;
+  if (CHECKIN) { pgClose(); return; }
   const ready = 'When the table is ready, say "begin".';
   sysLine(`When the table is ready, say <b>"begin"</b>. Until then, tell the Dungeon Master anything about your characters.`);
-  whenRevealed(() => speak(ready));
+  if (grand && gen === PG.gen) {
+    /* let the title card breathe, even when the DM answers quickly */
+    await pgWait(Math.max(0, 6500 - (Date.now() - t0)));
+    await pgHeroes(LAST_DM, gen);
+    if (gen !== PG.gen) return;
+    pgCompany();
+    speak('The company is assembled. ' + ready);
+  } else whenRevealed(() => speak(ready));
   hint(ready);
 }
 function beginStory() {
+  if (PG.on) pgClose(true);
   S.session.begun = true;
   queueSave();
   hint('The story begins.');
@@ -3085,6 +3447,7 @@ function stopHere() {
 
 /* ---------- the campaign picker ---------------------------------------- */
 async function openPicker() {
+  pgClose();                                     // the list must not open behind the ceremony
   document.getElementById('picker').className = 'picker on';
   const list = document.getElementById('pickerlist');
   try {
@@ -3276,6 +3639,13 @@ function voiceCommand(raw) {
   }
   if (document.getElementById('spot').classList.contains('on') && short
       && /\b(close|back|done|hide|dismiss|ok|okay)\b/.test(t)) { closeSpot(); return true; }
+  /* the pageant: on to the next hero, or out of the ceremony altogether */
+  if (PG.on && short && PG.stage !== 'company' && /^(next|skip|go on|move on|carry on)( one| please)?$/.test(t)) {
+    pgSkip(); return true;
+  }
+  if (PG.on && short && /^(close|hide|dismiss|show (me )?the (map|board|table))( it| this)?( please)?$/.test(t)) {
+    pgClose(); return true;
+  }
 
   if (CHECKIN) {
     if (/\b(keep (playing|going)|carry on|continue|yes)\b/.test(t)) keepGoing();
@@ -3467,7 +3837,11 @@ document.getElementById('spot').addEventListener('click', ev => {
   if (ev.target.tagName !== 'IMG') closeSpot();
 });
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') closeSpot();
+  if (ev.key === 'Escape') { closeSpot(); pgClose(); }
+});
+/* the pageant: a click moves on to the next hero, or leaves the company screen */
+document.getElementById('pageant').addEventListener('click', () => {
+  if (PG.stage === 'company') pgClose(); else if (PG.stage !== 'close') pgSkip();
 });
 
 draw();
