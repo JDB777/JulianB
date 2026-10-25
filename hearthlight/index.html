@@ -425,7 +425,7 @@
   <button class="pill link" id="voicepill" title="The Dungeon Master reads its narration aloud">DM voice: on</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h8</span>
+  <span class="pill" id="buildpill" title="build">h9</span>
   <button class="mic" id="micbtn" title="Talk to the Dungeon Master. Say &quot;mic off&quot; to put it to sleep, &quot;mic on&quot; to wake it.">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
@@ -3347,9 +3347,11 @@ let VOICE_PICK;
 function narratorVoice() {
   if (VOICE_PICK) return VOICE_PICK;
   const vs = TTS.getVoices().filter(v => /^en/i.test(v.lang));
-  VOICE_PICK = vs.find(v => /natural/i.test(v.name) && /(guy|ryan|davis|andrew|brian|christopher)/i.test(v.name))
+  /* the narrator is a British woman: Sonia in Edge, the Google one in Chrome */
+  VOICE_PICK = vs.find(v => /natural/i.test(v.name) && /sonia/i.test(v.name))
+    || vs.find(v => /natural/i.test(v.name) && /(libby|ava|emma|jenny|aria)/i.test(v.name))
     || vs.find(v => /natural/i.test(v.name))
-    || vs.find(v => /google uk english male/i.test(v.name))
+    || vs.find(v => /google uk english female/i.test(v.name))
     || vs.find(v => /google/i.test(v.name)) || vs[0] || null;
   return VOICE_PICK;
 }
