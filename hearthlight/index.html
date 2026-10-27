@@ -331,6 +331,38 @@
                   padding: 0 2px; border-radius: 3px; background: rgba(0,0,0,.6); }
   .tok.dead { background: transparent; border: 1.5px dashed var(--dead); opacity: .6; }
   .tok.act  { box-shadow: 0 0 0 2px var(--accent); }
+
+  /* Read from the sofa. Julian, 2026-10-26: "we'll be sitting a little ways
+     away, and the tokens all looked the same". So every figure stands on a
+     disc of its own colour - each hero has one, the enemy is red - with a
+     big initial, and whoever's turn it is glows. --tc is the colour; --cell
+     is the square's width, measured after each draw. */
+  #board .tok.disc { inset: 1%; border-radius: 50%; overflow: visible; padding: 0;
+                     border: max(4px, calc(var(--cell, 30px) * .14)) solid var(--tc);
+                     background: var(--tc) center / 112% no-repeat;
+                     box-shadow: 0 0 0 1.5px rgba(0,0,0,.75), 0 2px 6px rgba(0,0,0,.45); }
+  #board .tok.disc.art { background-image: var(--art); background-color: var(--tc);
+                         background-size: 104%; background-position: center; }
+  #board .tok.disc .pic { display: none; }
+  #board .tok.disc .mark { position: absolute; right: -14%; bottom: -14%; z-index: 2;
+                           min-width: calc(var(--cell, 30px) * .5); height: calc(var(--cell, 30px) * .5);
+                           padding: 0 .12em; border-radius: 999px; display: grid; place-items: center;
+                           background: var(--tc); color: #fff; font-weight: 900;
+                           font-size: calc(var(--cell, 30px) * .36); line-height: 1;
+                           box-shadow: 0 0 0 1.5px rgba(0,0,0,.8);
+                           text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  #board .tok.disc.foe .mark { font-size: calc(var(--cell, 30px) * .28); }
+  #board .tok.disc > .hpbar { left: 8%; right: 8%; bottom: -10%; height: 3px; z-index: 1;
+                              background: rgba(0,0,0,.55); }
+  #board .tok.disc.act { z-index: 3; animation: myturn 1.6s ease-in-out infinite;
+                         box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(0,0,0,.8),
+                                     0 0 calc(var(--cell, 30px) * .5) calc(var(--cell, 30px) * .18) var(--tc); }
+  @keyframes myturn { 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(0,0,0,.8),
+                                        0 0 calc(var(--cell, 30px) * .8) calc(var(--cell, 30px) * .32) var(--tc); } }
+  #board .tok.disc.down { filter: grayscale(.85) brightness(.75); }
+  #board td { overflow: visible; }
+  .legend .sw.round { border-radius: 50%; border: 0; }
+  @media (prefers-reduced-motion: reduce) { #board .tok.disc.act { animation: none; } }
   /* an <img> drops straight into .pic when image generation arrives */
   /* at this cell size the tag IS the token; an <img> replaces it later */
   .pic { flex: none; width: 100%; height: 100%; border-radius: 3px;
@@ -529,7 +561,7 @@
   <button class="pill link" id="voicepill" title="The Dungeon Master reads its narration aloud">DM voice: on</button>
   <span class="pill" id="spendpill" title="Spent on the Dungeon Master this campaign, and where the next check-in is">$— </span>
   <!-- so a stale cached page is obvious at a glance; bump on every deploy -->
-  <span class="pill" id="buildpill" title="build">h10</span>
+  <span class="pill" id="buildpill" title="build">h11</span>
   <button class="mic" id="micbtn" title="Talk to the Dungeon Master. Say &quot;mic off&quot; to put it to sleep, &quot;mic on&quot; to wake it.">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
       <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
@@ -600,8 +632,7 @@
       <span><i class="sw" style="background:var(--move)"></i> can reach</span>
       <span><i class="sw" style="background:var(--rough)"></i> rubble, costs 2</span>
       <span><i class="sw" style="background:var(--wall)"></i> wall</span>
-      <span><i class="sw" style="background:var(--heroBg);border-color:var(--hero)"></i> you</span>
-      <span><i class="sw" style="background:var(--foeBg);border-color:var(--foe)"></i> enemies</span>
+      <span id="legendcast"></span>
       <span>hover a token for its name and health</span>
     </div>
   </div>
@@ -2034,11 +2065,52 @@ function token(who, kind) {
   const title = `${who.name} — ${who.at}` +
         (dead ? ' — dead' : ` — ${Math.max(0, who.hp)}/${who.max} HP`);
   const art = dead ? null : tokenArt(who, kind);
-  return `<div class="tok ${dead ? 'dead' : kind} ${art ? 'art' : ''} ${act && !dead ? 'act' : ''}"
-       title="${title}" ${art ? `style="background-image:url('assets/${art.thumb}')"` : ''}>
-      <div class="pic">${dead ? '†' : tagFor(who, kind)}${down ? '↓' : ''}</div>
-      ${dead ? '' : `<div class="hpbar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>`}
+  if (dead) return `<div class="tok dead" title="${title}"><div class="pic">†</div></div>`;
+  /* a hero is marked with their first initial, a monster with its tag (G2) */
+  const mark = kind === 'foe' ? tagFor(who, kind) : who.name.trim()[0].toUpperCase();
+  const vars = `--tc:${kind === 'foe' ? (who.boss ? FOE_BOSS : FOE_COLOUR) : heroColour(who)}`
+             + (art ? `;--art:url('assets/${art.thumb}')` : '');
+  return `<div class="tok disc ${kind} ${art ? 'art' : ''} ${act ? 'act' : ''} ${down ? 'down' : ''}"
+       title="${title}" style="${vars}">
+      <div class="pic">${tagFor(who, kind)}</div>
+      <div class="mark">${mark}${down ? '↓' : ''}</div>
+      <div class="hpbar ${pct <= 34 ? 'low' : ''}"><i style="width:${pct}%"></i></div>
     </div>`;
+}
+
+/* Each hero's own colour, by seat, bright enough to tell apart across a room
+   and none of them the enemy's red. */
+const HERO_COLOURS = ['#e9a90c', '#11a99b', '#8c5cf6', '#2f8cf0', '#e35d9c'];
+const FOE_COLOUR = '#c8322a', FOE_BOSS = '#7d1410';
+const heroColour = c => HERO_COLOURS[Math.max(0, (S ? S.chars.indexOf(c) : 0)) % HERO_COLOURS.length];
+
+/* The part of the board worth showing. The whole 30 x 20 grid made every
+   square about 30px on a TV, too small to read from the sofa, so a fight
+   shows only the area around its figures and the squares the hero can reach,
+   kept at the board's 3:2 so squares stay square. It holds still while
+   everything still fits, so the board does not jump about every step. */
+let VIEW = null;
+function viewBox() {
+  const all = { x0: 0, y0: 0, x1: COLS - 1, y1: ROWS - 1 };
+  if (!S || !S.started) { VIEW = null; return all; }
+  const pts = [...S.chars.map(c => c.at), ...S.foes.filter(f => !f.gone).map(f => f.at), ...Object.keys(reach)]
+    .map(s => /^([A-Z]+)(\d+)$/.exec(s || '')).filter(Boolean)
+    .map(m => [COL_NAMES.indexOf(m[1]), +m[2] - 1]).filter(p => p[0] >= 0);
+  if (!pts.length) return all;
+  const M = 2;
+  let x0 = Math.min(...pts.map(p => p[0])) - M, x1 = Math.max(...pts.map(p => p[0])) + M;
+  let y0 = Math.min(...pts.map(p => p[1])) - M, y1 = Math.max(...pts.map(p => p[1])) + M;
+  const fits = v => v && x0 >= v.x0 && x1 <= v.x1 && y0 >= v.y0 && y1 <= v.y1;
+  const need = { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  if (fits(VIEW) && (VIEW.y1 - VIEW.y0 + 1) <= Math.max(10, need.h, need.w / 1.5) * 1.5) return VIEW;
+  let h = Math.max(10, need.h, Math.ceil(need.w / 1.5));
+  h += h % 2;                                       // so the width comes out whole
+  let w = h * 1.5;
+  if (w >= COLS || h >= ROWS) return (VIEW = all);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  let vx0 = Math.round(cx - (w - 1) / 2), vy0 = Math.round(cy - (h - 1) / 2);
+  vx0 = Math.max(0, Math.min(COLS - w, vx0)); vy0 = Math.max(0, Math.min(ROWS - h, vy0));
+  return (VIEW = { x0: vx0, y0: vy0, x1: vx0 + w - 1, y1: vy0 + h - 1 });
 }
 
 /* the picture for a figure on the board, if the campaign produced one */
@@ -2152,10 +2224,14 @@ function drawCast() {
 
   el.innerHTML = `<h2>${fighting ? 'In the fight' : S ? 'The party and the people' : 'Cast'}</h2>` + rows.map((r, i) => {
     const src = r.art ? `assets/${r.art.thumb}` : '';
-    return `<div class="castcard ${r.cls}" data-i="${i}" title="${r.label}">
-      ${src ? `<img src="${src}" alt="${r.label}" loading="lazy">`
+    /* a hero's card wears the same colour as their disc on the board */
+    const hero = S && S.chars.find(c => c.name === r.label);
+    const tint = hero ? heroColour(hero) : fighting && r.cls === 'foe' ? FOE_COLOUR : '';
+    return `<div class="castcard ${r.cls}" data-i="${i}" title="${r.label}"
+      ${tint ? `style="border-left:6px solid ${tint}"` : ''}>
+      ${src ? `<img src="${src}" alt="${r.label}" loading="lazy" ${tint ? `style="background:${tint}"` : ''}>`
             : '<img alt="" style="opacity:.25">'}
-      <div class="cap">${r.label}</div>
+      <div class="cap" ${hero ? `style="font-weight:800"` : ''}>${r.label}</div>
       ${r.sub ? `<div class="sub">${r.sub}</div>` : ''}
     </div>`;
   }).join('')
@@ -2299,12 +2375,13 @@ function aimDist() {
 
 function draw() {
   if (HOLD) { DIRTY = true; return; }               // nothing may give the roll away
+  const v = viewBox();
   let html = '<tr class="head"><th class="rowh"></th>';
-  for (let x = 0; x < COLS; x++) html += `<th>${COL_NAMES[x]}</th>`;
+  for (let x = v.x0; x <= v.x1; x++) html += `<th>${COL_NAMES[x]}</th>`;
   html += '</tr>';
-  for (let y = 0; y < ROWS; y++) {
+  for (let y = v.y0; y <= v.y1; y++) {
     html += `<tr><th class="rowh">${y + 1}</th>`;
-    for (let x = 0; x < COLS; x++) {
+    for (let x = v.x0; x <= v.x1; x++) {
       const s = sqName(x, y);
       const cls = [(x + y) % 2 ? 'alt' : ''];
       let inner = '';
@@ -2334,10 +2411,31 @@ function draw() {
   b.className = SCENE ? 'scene' : '';
   b.innerHTML = html;
   b.querySelectorAll('td').forEach(td => td.addEventListener('click', () => clickSquare(td.dataset.sq)));
+  sizeCells(); requestAnimationFrame(sizeCells);
+  drawLegendCast();
   drawHero(); drawConds(); drawAbilities(); drawEnemies(); drawSave();
   drawHeader(); drawChat(); drawTown(); drawClock();
   drawCast(); syncButtons();
   queueSave();
+}
+
+/* --cell: a square's width, which the token marks and the turn glow scale
+   with. A board measured while hidden reads 0, so that is never kept. */
+function sizeCells() {
+  const b = document.getElementById('board'), td = b && b.querySelector('td');
+  const w = td ? td.getBoundingClientRect().width : 0;
+  if (w > 4) b.style.setProperty('--cell', w.toFixed(1) + 'px');
+}
+if (window.ResizeObserver) new ResizeObserver(() => sizeCells()).observe(document.getElementById('board'));
+
+/* under the board: each hero's colour and name, so the table learns them */
+function drawLegendCast() {
+  const el = document.getElementById('legendcast');
+  if (!el) return;
+  el.innerHTML = !S ? '' : S.chars.map(c =>
+    `<span><i class="sw round" style="background:${heroColour(c)}"></i> ${esc(c.name.split(' ')[0])}</span>`).join(' ')
+    + ` <span><i class="sw round" style="background:${FOE_COLOUR}"></i> enemies</span>`;
+  el.style.display = 'inline-flex'; el.style.gap = '12px';
 }
 
 function drawHeader() {
@@ -2347,6 +2445,7 @@ function drawHeader() {
   if (S && S.started) {
     tp.style.display = ''; tp.className = 'pill turn';
     tp.textContent = S.turn === 'hero' ? `${me().name}'s turn` : "the enemy's turn";
+    tp.style.background = S.turn === 'hero' ? heroColour(me()) : FOE_COLOUR;
   } else tp.style.display = 'none';
   fp.style.display = S && S.started ? '' : 'none';
   fp.textContent = S ? `${living().length} standing · ${S.foes.filter(f=>f.dead).length} dead · ${S.foes.filter(f=>f.gone).length} fled` : '—';
